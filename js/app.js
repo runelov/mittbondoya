@@ -170,23 +170,41 @@ function nearbyCountFor(norskNavn){
 // ---------- registreringsflyt ----------
 
 function wireRegisterFlow(){
-  el('fabRegister').addEventListener('click', startRegistration);
+  el('fabRegister').addEventListener('click', () => startRegistration(false));
+  el('fabGallery').addEventListener('click', () => startRegistration(true));
   el('cameraInput').addEventListener('change', onImageCaptured);
+  el('galleryInput').addEventListener('change', onImageCaptured);
 }
 
-function startRegistration(){
+// fraGalleri=false: kamera i felt — anta at brukeren står der bildet tas,
+// hent GPS-posisjon automatisk med det samme.
+// fraGalleri=true: etterregistrering av et bilde tatt tidligere (kamerarull)
+// — nåværende GPS-posisjon ville vært feil, så brukeren MÅ velge posisjon i
+// kartet i stedet (se pickPositionOnMap/renderRegisterPanel).
+function startRegistration(fraGalleri){
   pendingImageBlob = null;
   pendingPosition = null;
   pendingKiResultat = null;
-  if (navigator.geolocation) {
+  if (!fraGalleri && navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
       pos => { pendingPosition = { lat: pos.coords.latitude, lon: pos.coords.longitude }; },
-      () => { /* la brukeren velge i kart i stedet, se manuell posisjon under */ },
+      () => { /* la brukeren velge i kart i stedet, se posisjonsvelgeren under */ },
       { enableHighAccuracy: true, timeout: 8000 }
     );
   }
-  el('cameraInput').value = '';
-  el('cameraInput').click();
+  const input = fraGalleri ? el('galleryInput') : el('cameraInput');
+  input.value = '';
+  input.click();
+}
+
+function pickPositionOnMap(){
+  toggleSheet('registerPanel', false);
+  showToast('Trykk i kartet der bildet ble tatt');
+  mapCtx.map.once('click', (e) => {
+    pendingPosition = { lat: e.latlng.lat, lon: e.latlng.lng };
+    toggleSheet('registerPanel', true);
+    renderRegisterPanel({ scanning: false });
+  });
 }
 
 async function onImageCaptured(e){
@@ -272,9 +290,14 @@ function renderRegisterPanel(state){
     kiHtml = `<p class="hint">Ingen KI-forslag (proxy ikke konfigurert eller ingen treff). Velg art manuelt under.</p>`;
   }
 
+  const posHtml = pendingPosition
+    ? `📍 ${pendingPosition.lat.toFixed(5)}, ${pendingPosition.lon.toFixed(5)} <button id="changePosBtn" class="linkBtn">endre</button>`
+    : `<button id="pickPosBtn" class="secondaryBtn">📍 Velg posisjon i kart</button>`;
+
   c.innerHTML = `
     <img src="${previewUrl}" class="previewImg" alt="">
     ${kiHtml}
+    <div id="posStatus" class="posStatus">${posHtml}</div>
     <label for="speciesSearch">Søk art manuelt</label>
     <input id="speciesSearch" type="text" placeholder="f.eks. havørn" autocomplete="off">
     <div id="speciesResults" class="speciesResults"></div>
@@ -283,6 +306,9 @@ function renderRegisterPanel(state){
       <button id="saveFindBtn" class="primaryBtn" disabled>Lagre funn</button>
       <button id="cancelFindBtn" class="secondaryBtn">Avbryt</button>
     </div>`;
+
+  const pickBtn = el('pickPosBtn') || el('changePosBtn');
+  if (pickBtn) pickBtn.addEventListener('click', pickPositionOnMap);
 
   let valgtArt = (beste && autoVelg) ? { norsk: beste.art.norsk, latinsk: beste.art.latinsk, artstype: beste.artstype } : null;
   updateSaveButton();
@@ -294,7 +320,7 @@ function renderRegisterPanel(state){
       : '';
     updateSaveButton();
   }
-  function updateSaveButton(){ el('saveFindBtn').disabled = !valgtArt; }
+  function updateSaveButton(){ el('saveFindBtn').disabled = !valgtArt || !pendingPosition; }
 
   c.querySelectorAll('.candidateCard').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -323,8 +349,8 @@ function renderRegisterPanel(state){
 }
 
 async function saveFind(art){
-  const pos = pendingPosition; // TODO: la bruker justere manuelt i kart hvis GPS mangler
-  if (!pos) { showToast('Fant ikke posisjon ennå — vent litt eller prøv igjen.'); return; }
+  const pos = pendingPosition; // sikkerhetsnett — knappen er disablet uten posisjon, se updateSaveButton
+  if (!pos) { showToast('Velg posisjon i kartet først.'); return; }
 
   const entry = {
     art, artstype: art.artstype, lat: pos.lat, lon: pos.lon,
