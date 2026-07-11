@@ -70,35 +70,45 @@ export default {
       const mediaType = bildeFil.type && bildeFil.type.startsWith('image/') ? bildeFil.type : 'image/jpeg';
 
       const prompt = buildPrompt(kandidater);
+      const anthropicBody = JSON.stringify({
+        model: env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+        max_tokens: 512,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+            { type: 'text', text: prompt },
+          ],
+        }],
+      });
 
-      let anthropicRes;
-      try {
-        anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-          method: 'POST',
-          headers: {
-            'x-api-key': env.ANTHROPIC_API_KEY,
-            'anthropic-version': '2023-06-01',
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: env.ANTHROPIC_MODEL || 'claude-sonnet-5',
-            max_tokens: 512,
-            messages: [{
-              role: 'user',
-              content: [
-                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-                { type: 'text', text: prompt },
-              ],
-            }],
-          }),
-        });
-      } catch (e) {
-        return json({ error: `Nettverksfeil mot Anthropic: ${e.message}` }, 502, cors);
-      }
-
-      if (!anthropicRes.ok) {
-        const errText = await anthropicRes.text();
-        return json({ error: `KI-kall feilet (${anthropicRes.status}): ${errText}` }, 502, cors);
+      // Anthropic (eller infrastrukturen foran den) svarer av og til med en
+      // kort, generisk "error code: 5xx" — et forbigående gateway-hikke, ikke
+      // en reell feil med kall/nøkkel/bilde (observert i praksis 2026-07-11).
+      // Prøver derfor opptil 2 ganger til på 5xx-feil før vi gir opp.
+      let anthropicRes, lastErrText, lastStatus;
+      for (let forsok = 1; forsok <= 3; forsok++) {
+        try {
+          anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': env.ANTHROPIC_API_KEY,
+              'anthropic-version': '2023-06-01',
+              'content-type': 'application/json',
+            },
+            body: anthropicBody,
+          });
+        } catch (e) {
+          if (forsok === 3) return json({ error: `Nettverksfeil mot Anthropic: ${e.message}` }, 502, cors);
+          continue;
+        }
+        if (anthropicRes.ok) break;
+        lastStatus = anthropicRes.status;
+        lastErrText = await anthropicRes.text();
+        if (lastStatus < 500 || forsok === 3) {
+          return json({ error: `KI-kall feilet (${lastStatus}): ${lastErrText}` }, 502, cors);
+        }
+        await new Promise(r => setTimeout(r, forsok * 400));
       }
 
       let anthropicData;

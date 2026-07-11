@@ -1,5 +1,15 @@
 # Endringslogg
 
+## 0.1.1 — Robusthet i KI-proxyen
+- **Rettet feilnavngitt Cloudflare-hemmelighet**: `wrangler secret put` hadde
+  blitt kjørt med selve nøkkelverdien som navn ved en feiltakelse, i stedet
+  for `ANTHROPIC_API_KEY`/`APP_SHARED_SECRET` — begge er nå satt riktig.
+- **Retry ved forbigående 5xx fra Anthropic**: observert i praksis
+  (2026-07-11) at kall til Anthropic av og til får et kort, generisk
+  `error code: 502`-svar (gateway-hikke, ikke en reell feil med nøkkel/kall).
+  Workeren prøver nå opptil 2 ganger til (kort backoff) før den gir opp og
+  returnerer feil til appen.
+
 ## 0.1.0 — Første MVP-versjon
 Grunnleggende funksjonalitet på plass, basert på konsept.md sin fase 1:
 
