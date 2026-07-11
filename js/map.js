@@ -8,6 +8,16 @@
 // Samlet bounding box over alle tre øyene + litt margin. BEKREFT VISUELT at
 // dette faktisk dekker riktig område — se konsept.md.
 
+// Bondøya alene — brukes for startvisningen, slik at selve øya fyller
+// skjermen i stedet for å drukne i omkringliggende hav/øyer.
+const BONDOYA_BOUNDS = L.latLngBounds(
+  [64.8141154, 10.7089637],
+  [64.8232203, 10.7338476]
+);
+
+// Bondøya + Liss-Bondøya + Risøya samlet — brukes kun som ytre panorerings-
+// og zoomgrense (maxBounds), ikke som startvisning. Naboøyene er dermed
+// fortsatt nåbare ved å panorere, uten å dominere bildet ved oppstart.
 const ISLANDS_BOUNDS = L.latLngBounds(
   [64.8141154, 10.6983937],
   [64.8232203, 10.7338476]
@@ -25,7 +35,7 @@ function initMap(){
     maxBoundsViscosity: 1.0
   });
 
-  map.fitBounds(ISLANDS_BOUNDS, { padding: [20, 20] });
+  map.fitBounds(BONDOYA_BOUNDS, { padding: [20, 20] });
   map.setMinZoom(map.getBoundsZoom(MAP_MAX_BOUNDS));
   map.setMaxZoom(20);
 
@@ -52,7 +62,9 @@ function initMap(){
 
   const baseLayers = { 'Kartverket (terreng)': topo };
   if (satellite) baseLayers['Mapbox (satellitt)'] = satellite;
-  L.control.layers(baseLayers, {}, { position: 'topright' }).addTo(map);
+  // bottomleft: Leaflets standard topright/bottomright kolliderer med appens
+  // egne ⚙️/📋-knapper (topBar) og GPS/zoom-knappene — bottomleft er ledig.
+  L.control.layers(baseLayers, {}, { position: 'bottomleft' }).addTo(map);
 
   const findsLayer = L.layerGroup().addTo(map);
 
