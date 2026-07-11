@@ -226,11 +226,18 @@ function pickPositionOnMap(){
 async function extractExif(file){
   if (!window.exifr) return {};
   let gps, dato;
-  try { gps = await window.exifr.gps(file); } catch (e) { /* ingen GPS-data i bildet */ }
+  try { gps = await window.exifr.gps(file); } catch (e) { console.debug('EXIF: ingen GPS-data', e); }
   try {
-    const parsed = await window.exifr.parse(file, ['DateTimeOriginal', 'CreateDate']);
+    // MERK: exifr sitt array-form for å plukke enkelttags (parse(file, [...]))
+    // kastet en intern feil i "lite"-bygget her (Symbol.iterator-feil i
+    // setupGlobalFilters) — full parse() uten valg er tregere, men stabil.
+    const parsed = await window.exifr.parse(file);
     dato = parsed && (parsed.DateTimeOriginal || parsed.CreateDate);
-  } catch (e) { /* ingen dato-data i bildet */ }
+  } catch (e) { console.debug('EXIF: ingen dato-data', e); }
+  // Kun til feilsøking (åpne konsollen for å se om et bilde faktisk mangler
+  // EXIF — vanlig for nedlastede/delte bilder som har gått via komprimering,
+  // i motsetning til et fersk, uredigert bilde rett fra kameraet).
+  console.debug('EXIF lest fra', file.name, { gps, dato });
   return { gps, dato };
 }
 
@@ -256,10 +263,13 @@ async function onImageCaptured(e){
     try {
       const hint = buildSpeciesHintList();
       pendingKiResultat = await window.KiClient.gjenkjenn(pendingImageBlob, hint);
+      console.debug('KI-svar', pendingKiResultat);
     } catch (err) {
       console.warn('KI-gjenkjenning feilet', err);
       pendingKiResultat = null;
     }
+  } else {
+    console.debug('KI-proxy er ikke konfigurert (Innstillinger → KI-proxy URL) — hopper over gjenkjenning.');
   }
   renderRegisterPanel({ scanning: false });
 }
