@@ -8,16 +8,24 @@
 //
 // Kontrakt appen (js/ki-client.js) forventer:
 //   POST multipart/form-data: bilde=<fil>, kandidater=<JSON-array>
+//   Header: X-App-Secret: <delt hemmelighet, samme idé som GitHub-tokenet>
 //   -> 200 { kandidater: [ { norsk, latinsk, artstype, konfidens }, ... ] }
 // Pluggbart: bytt kun denne filen for å bruke en annen KI-motor (f.eks.
 // iNaturalist CV) senere uten å røre js/ki-client.js sin kontrakt.
+//
+// X-App-Secret finnes fordi CORS (Access-Control-Allow-Origin) kun stopper
+// NETTLESERE — noen som finner denne Worker-URL-en kan uansett kalle den
+// direkte med curl/script og bruke opp Anthropic-kredittene dine. Sjekken her
+// er ikke vanntett (delt hemmelighet i klientkode), men hever terskelen
+// betydelig for en app med 10-15 kjente brukere, konsistent med hvordan
+// GitHub-tokenet allerede fungerer som "delt hemmelighet" i resten av appen.
 
 export default {
   async fetch(request, env) {
     const cors = {
       'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, X-App-Secret',
     };
 
     if (request.method === 'OPTIONS') {
@@ -25,6 +33,13 @@ export default {
     }
     if (request.method !== 'POST') {
       return json({ error: 'Kun POST støttes.' }, 405, cors);
+    }
+
+    if (!env.APP_SHARED_SECRET) {
+      return json({ error: 'Workeren er ikke satt opp riktig: APP_SHARED_SECRET mangler. Sett den med "wrangler secret put APP_SHARED_SECRET".' }, 500, cors);
+    }
+    if (!timingSafeEqual(request.headers.get('X-App-Secret') || '', env.APP_SHARED_SECRET)) {
+      return json({ error: 'Ugyldig eller manglende X-App-Secret.' }, 401, cors);
     }
 
     let form;
@@ -137,4 +152,17 @@ function json(obj, status, headers) {
     status,
     headers: { 'Content-Type': 'application/json', ...headers },
   });
+}
+
+// Konstant-tid strengsammenligning — unngår at responstiden lekker info om
+// hvor mange tegn av hemmeligheten som stemte (mindre relevant på denne
+// skalaen, men billig å gjøre riktig).
+function timingSafeEqual(a, b) {
+  const enc = new TextEncoder();
+  const aBytes = enc.encode(a);
+  const bBytes = enc.encode(b);
+  if (aBytes.length !== bBytes.length) return false;
+  let diff = 0;
+  for (let i = 0; i < aBytes.length; i++) diff |= aBytes[i] ^ bBytes[i];
+  return diff === 0;
 }

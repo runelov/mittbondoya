@@ -71,6 +71,8 @@ async function refreshFromRepo(){
 
 // ---------- setup-panel ----------
 
+const MAPBOX_TOKEN_KEY = 'mittbondoya-mapbox-token';
+
 function wireSetupPanel(){
   const cfg = window.GhStore.getConfig();
   if (cfg) {
@@ -79,6 +81,8 @@ function wireSetupPanel(){
     el('ghToken').value = cfg.token;
   }
   el('kiProxyUrl').value = window.KiClient.getProxyUrl();
+  el('kiSharedSecret').value = window.KiClient.getSharedSecret();
+  el('mapboxToken').value = localStorage.getItem(MAPBOX_TOKEN_KEY) || '';
 
   el('setupToggle').addEventListener('click', () => toggleSheet('setupPanel'));
 
@@ -87,6 +91,8 @@ function wireSetupPanel(){
     const repo = el('ghRepo').value.trim();
     const token = el('ghToken').value.trim();
     const kiUrl = el('kiProxyUrl').value.trim();
+    const kiSecret = el('kiSharedSecret').value.trim();
+    const mapboxToken = el('mapboxToken').value.trim();
     if (!owner || !repo || !token) {
       el('ghNote').textContent = 'Fyll ut eier, repo og token.';
       return;
@@ -96,9 +102,13 @@ function wireSetupPanel(){
       const branch = await window.GhStore.detectDefaultBranch(owner, repo, token);
       window.GhStore.setConfig({ owner, repo, token, branch });
       if (kiUrl) window.KiClient.setProxyUrl(kiUrl);
+      if (kiSecret) window.KiClient.setSharedSecret(kiSecret);
+      const mapboxChanged = mapboxToken && mapboxToken !== (localStorage.getItem(MAPBOX_TOKEN_KEY) || '');
+      if (mapboxToken) localStorage.setItem(MAPBOX_TOKEN_KEY, mapboxToken);
       el('ghNote').textContent = `Tilkoblet (branch: ${branch}).`;
       await refreshFromRepo();
       toggleSheet('setupPanel', false);
+      if (mapboxChanged) { showToast('Mapbox-token lagret — laster kartet på nytt …'); setTimeout(() => location.reload(), 800); }
     } catch (e) {
       el('ghNote').textContent = 'Feil: ' + e.message;
     }

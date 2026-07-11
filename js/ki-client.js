@@ -6,6 +6,7 @@
 // KI-motor (Claude-vision <-> iNaturalist CV) uten å røre resten av appen.
 
 const KI_PROXY_URL_KEY = 'mittbondoya-ki-proxy-url';
+const KI_SHARED_SECRET_KEY = 'mittbondoya-ki-shared-secret';
 const KONFIDENS_AUTO_TERSKEL = 0.75; // over dette: velg automatisk. Under: vis alternativer.
 
 function getProxyUrl(){
@@ -13,6 +14,12 @@ function getProxyUrl(){
 }
 function setProxyUrl(url){
   localStorage.setItem(KI_PROXY_URL_KEY, url);
+}
+function getSharedSecret(){
+  return localStorage.getItem(KI_SHARED_SECRET_KEY) || '';
+}
+function setSharedSecret(secret){
+  localStorage.setItem(KI_SHARED_SECRET_KEY, secret);
 }
 function isConfigured(){
   return !!getProxyUrl();
@@ -30,7 +37,11 @@ async function gjenkjenn(imageBlob, speciesHint){
   form.append('bilde', imageBlob, 'funn.jpg');
   form.append('kandidater', JSON.stringify(speciesHint || []));
 
-  const res = await fetch(url, { method: 'POST', body: form });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'X-App-Secret': getSharedSecret() },
+    body: form
+  });
   if (!res.ok) throw new Error(`KI-proxy svarte ${res.status}: ${await res.text()}`);
   const data = await res.json();
 
@@ -47,4 +58,4 @@ async function gjenkjenn(imageBlob, speciesHint){
   };
 }
 
-window.KiClient = { getProxyUrl, setProxyUrl, isConfigured, gjenkjenn, KONFIDENS_AUTO_TERSKEL };
+window.KiClient = { getProxyUrl, setProxyUrl, getSharedSecret, setSharedSecret, isConfigured, gjenkjenn, KONFIDENS_AUTO_TERSKEL };

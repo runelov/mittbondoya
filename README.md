@@ -29,20 +29,34 @@ manifest.json, sw.js    PWA-installerbarhet
 2. Sett opp det private data-repoet — se README i
    [mittbondoya-db](https://github.com/runelov/mittbondoya-db).
 3. Deploy KI-proxyen — se `worker/ki-proxy/README.md` (krever egen
-   Cloudflare- og Anthropic-konto/nøkkel).
-4. Skaff et Mapbox access token (gratis tier) for satellittlaget, lagre det i
-   nettleserens konsoll: `localStorage.setItem('mittbondoya-mapbox-token', '...')`
-   (midlertidig løsning for MVP — flyttes inn i settings-panelet senere).
+   Cloudflare- og Anthropic-konto/nøkkel, samt en `APP_SHARED_SECRET` du
+   finner opp selv, f.eks. med `openssl rand -hex 32`).
+4. Skaff et **Mapbox access token** (gratis tier) for satellittlaget — bruk
+   et begrenset offentlig token (`pk.*`) låst til din faktiske GitHub
+   Pages-URL i Mapbox sitt dashbord (Account → Tokens → URL restrictions),
+   ikke standardtokenet med full tilgang.
 5. Åpne den publiserte siden → ⚙️-knappen → fyll inn data-repo + token +
-   KI-proxy URL → **Koble til**.
+   KI-proxy URL + KI-delt hemmelighet + Mapbox-token → **Koble til**.
 
 ## Sikkerhet
 
-- Tokenet (til data-repoet) lagres kun i `localStorage` i nettleseren din —
-  aldri i kode eller i dette repoet.
+- **GitHub-tokenet** (til data-repoet) lagres kun i `localStorage` i
+  nettleseren din — aldri i kode eller i dette repoet. Bruk et
+  fine-grained token med utløpsdato (f.eks. 90 dager), begrenset til kun
+  `mittbondoya-db`.
+- **KI-delt hemmelighet** (`X-App-Secret`) hindrer at andre enn appen kan
+  kalle KI-proxyen direkte og bruke opp Anthropic-kredittene dine — CORS
+  alene stopper kun nettlesere, ikke curl/script mot en lekket Worker-URL.
+- **Mapbox-tokenet** er ment å ligge i klientkode (det er hva `pk.*`-tokens
+  er for) — sikkerheten der ligger i URL-restriksjon i Mapbox sitt
+  dashbord, ikke i å skjule tokenet.
 - Alt brukerinnhold escapes før det vises, for å hindre lagret XSS.
 - Hold data-repoet **privat** — denne appens Pages-URL er offentlig
   tilgjengelig for alle med lenken, men uten token kan ingen lese eller
   skrive funn.
-- `worker/ki-proxy/`s kildekode er trygg å dele — selve AI-nøkkelen settes
-  kun som en Cloudflare Worker-hemmelighet, aldri i denne koden.
+- `worker/ki-proxy/`s kildekode er trygg å dele — selve AI-nøkkelen og den
+  delte hemmeligheten settes kun som Cloudflare Worker-hemmeligheter,
+  aldri i denne koden.
+- Vurder å skru på **secret scanning + push protection** (repo Settings →
+  Security → Code security) på både dette og `mittbondoya-db`-repoet, som
+  et sikkerhetsnett mot at noen ved et uhell committer en ekte nøkkel.
