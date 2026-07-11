@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.1.4';
+const APP_VERSION = '0.1.5';
 const APP_BUILD_DATE = '2026-07-11';
 
 const el = id => document.getElementById(id);
@@ -519,6 +519,7 @@ async function openDetail(funn){
     ${bildeHtml}
     <h2>${escapeHtml(funn.art?.norsk || 'Ukjent art')}</h2>
     <p><em>${escapeHtml(funn.art?.latinsk || s.latinsk || '')}</em></p>
+    ${rodlisteBadge(s.rodlisteNorge)}
     ${s.beskrivelse ? `<p>${escapeHtml(s.beskrivelse)}</p>` : ''}
     ${count ? `<p class="hint">Registrert ${count} ganger i nærheten før (Artskart).</p>` : ''}
     <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}</p>
@@ -536,6 +537,19 @@ async function openDetail(funn){
     console.warn('Kunne ikke hente bilde for funn', funn.id, err);
     el('detailContent').innerHTML = detailHtml('<p class="hint">Kunne ikke laste bildet.</p>');
   }
+}
+
+// Norsk Rødliste 2021-kode -> lesbar norsk tekst + alvorlighetsklasse for
+// styling. Kun NT/VU/EN/CR regnes som "bekymringsfull" andre steder i appen
+// (se species.json sitt synligForPublic-felt, satt av en engangs-berikelse
+// mot Artskart sitt taxon-API 2026-07-11).
+const RODLISTE_LABELS = {
+  CR: 'Kritisk truet', EN: 'Sterkt truet', VU: 'Sårbar', NT: 'Nær truet'
+};
+function rodlisteBadge(kode){
+  const label = RODLISTE_LABELS[kode];
+  if (!label) return '';
+  return `<p class="rodlisteBadge">⚠ Rødlistet: ${escapeHtml(label)} (${escapeHtml(kode)}) — Norsk rødliste 2021</p>`;
 }
 
 // ---------- sheets / UI-hjelpere ----------

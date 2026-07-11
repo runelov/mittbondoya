@@ -1,5 +1,14 @@
 # Endringslogg
 
+## 0.1.5 — Rødlistestatus i artsdetaljer
+- Hentet ekte Norsk Rødliste 2021-status per art fra Artskart sitt
+  taxon-API, lagt til som `rodlisteNorge`/`synligForPublic`-felt i
+  `data/species.json`. Rødlistede arter (Ærfugl VU, Storskarv NT, Teist NT,
+  Krykkje EN, Gråmåke VU, Fiskemåke VU, Tjeld NT) vises nå med en tydelig
+  advarselsbadge i artsdetaljene. `synligForPublic`-feltet er forberedt for
+  fase 3 sin offentlig/pålogget-synlighetsstyring (rødlistede arter skjules
+  for offentlige som standard, admin kan skjule flere).
+
 ## 0.1.4 — "blomst" → "plante"
 - Byttet artstypen "blomst" til en bredere "plante" (dekker lyng, gress,
   mose, trær — ikke bare blomstrende planter). Ingen registrerte funn
