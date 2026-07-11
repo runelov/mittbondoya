@@ -321,7 +321,7 @@ function renderRegisterPanel(state){
           </button>`).join('')}
       </div>`;
   } else {
-    kiHtml = `<p class="hint">Ingen KI-forslag (proxy ikke konfigurert eller ingen treff). Velg art manuelt under.</p>`;
+    kiHtml = `<p class="hint">Fant ikke arten automatisk. Velg art manuelt under.</p>`;
   }
 
   const kildeLabel = { gps: '(GPS)', exif: '(fra bildet)', manuell: '(valgt manuelt)' }[pendingPositionKilde] || '';
@@ -373,16 +373,31 @@ function renderRegisterPanel(state){
   });
 
   el('speciesSearch').addEventListener('input', (ev) => {
-    const term = ev.target.value.trim().toLowerCase();
+    const rawTerm = ev.target.value.trim();
+    const term = rawTerm.toLowerCase();
     const results = term.length < 2 ? [] : speciesCache.filter(s =>
       s.norsk.toLowerCase().includes(term) || s.latinsk.toLowerCase().includes(term)
     ).slice(0, 6);
-    el('speciesResults').innerHTML = results.map((s, i) =>
-      `<button class="speciesResult" data-i="${i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`
-    ).join('');
-    el('speciesResults').querySelectorAll('.speciesResult').forEach((btn, i) => {
+    // Artslisten er en kuratert forventning, ikke en fasit — uventede funn
+    // (som en elg som har svømt ut til øya) skal fortsatt kunne registreres.
+    // Tilbyr derfor alltid "bruk som ny art" når søket ikke er et eksakt
+    // treff, i tillegg til eventuelle nære forslag.
+    const eksaktTreff = speciesCache.some(s => s.norsk.toLowerCase() === term);
+    const visFritekst = term.length >= 2 && !eksaktTreff;
+
+    el('speciesResults').innerHTML =
+      results.map((s, i) => `<button class="speciesResult" data-i="${i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('') +
+      (visFritekst ? `<button id="freeTextSpeciesBtn" class="speciesResult speciesResultFritekst">➕ Bruk «${escapeHtml(rawTerm)}» (ikke i listen)</button>` : '');
+
+    el('speciesResults').querySelectorAll('.speciesResult:not(.speciesResultFritekst)').forEach((btn, i) => {
       btn.addEventListener('click', () => { setValgt(results[i]); el('speciesResults').innerHTML=''; el('speciesSearch').value = results[i].norsk; });
     });
+    if (visFritekst) {
+      el('freeTextSpeciesBtn').addEventListener('click', () => {
+        setValgt({ norsk: rawTerm, latinsk: '', artstype: 'annet' });
+        el('speciesResults').innerHTML = '';
+      });
+    }
   });
 
   el('cancelFindBtn').addEventListener('click', () => toggleSheet('registerPanel', false));
@@ -435,7 +450,7 @@ async function saveFind(art){
 
 function wireListPanel(){
   el('listToggle').addEventListener('click', () => { renderList(); toggleSheet('listPanel'); });
-  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'alge', 'blomst', 'annet'];
+  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'alge', 'blomst', 'annet'];
   el('filterRow').innerHTML = artstyper.map(t =>
     `<button class="filterChip${t===activeFilter?' active':''}" data-t="${t}">${t}</button>`
   ).join('');

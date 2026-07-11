@@ -99,6 +99,7 @@ function initMap(){
 const ARTSTYPE_COLORS = {
   fugl: '#0a84ff',
   sjøpattedyr: '#8e8e93',
+  pattedyr: '#5e5ce6',
   alge: '#34c759',
   blomst: '#ff9500',
   annet: '#af52de'

@@ -252,6 +252,7 @@ body{
   min-height: 44px; text-align: left; padding: 0 12px;
   border: none; border-bottom: 1px solid var(--line); background: transparent;
 }
+.speciesResultFritekst{ color: var(--accent); font-weight: 600; }
 .selectedSpecies{ margin: 10px 0; font-size: 14px; }
 
 /* ---------- toast ---------- */

@@ -1,5 +1,13 @@
 [
   {
+    "norsk": "Elg",
+    "latinsk": "Alces alces",
+    "artstype": "pattedyr",
+    "taxonId": 31241,
+    "beskrivelse": "Norges største landpattedyr. Uvanlig, men bekreftet forekommende på Bondøya — elg er en god svømmer og krysser av og til korte sund til kystnære øyer.",
+    "artskartUrl": "https://artskart.artsdatabanken.no/#taxon/31241"
+  },
+  {
     "norsk": "Ærfugl",
     "latinsk": "Somateria mollissima",
     "artstype": "fugl",
