@@ -1,5 +1,10 @@
 # Endringslogg
 
+## 0.1.4 — "blomst" → "plante"
+- Byttet artstypen "blomst" til en bredere "plante" (dekker lyng, gress,
+  mose, trær — ikke bare blomstrende planter). Ingen registrerte funn
+  brukte "blomst" ennå, så ingen datamigrering nødvendig.
+
 ## 0.1.3 — Ordentlig app-ikon
 - Erstattet plassholder-ikonet med et design basert på konsept B
   ("luftfoto-utsnitt") — Bondøyas faktiske kystlinje (hentet fra

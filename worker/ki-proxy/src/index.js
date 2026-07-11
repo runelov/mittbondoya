@@ -153,7 +153,7 @@ om usikkerhet — ikke tving frem en lokal art hvis bildet klart viser noe annet
 
 Svar KUN med gyldig JSON i nøyaktig dette formatet, ingen annen tekst, ingen \
 markdown-kodeblokk:
-{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|sjøpattedyr|alge|blomst|annet","konfidens":0.0}]}`;
+{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|pattedyr|sjøpattedyr|plante|alge|annet","konfidens":0.0}]}`;
 }
 
 function parseModelJson(text) {

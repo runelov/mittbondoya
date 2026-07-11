@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.1.3';
+const APP_VERSION = '0.1.4';
 const APP_BUILD_DATE = '2026-07-11';
 
 const el = id => document.getElementById(id);
@@ -476,7 +476,7 @@ async function saveFind(art){
 
 function wireListPanel(){
   el('listToggle').addEventListener('click', () => { renderList(); toggleSheet('listPanel'); });
-  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'alge', 'blomst', 'annet'];
+  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
   el('filterRow').innerHTML = artstyper.map(t =>
     `<button class="filterChip${t===activeFilter?' active':''}" data-t="${t}">${t}</button>`
   ).join('');
