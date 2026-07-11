@@ -1,5 +1,11 @@
 # Endringslogg
 
+## 0.1.2 — Fjern utdatert meta-tag-advarsel
+- Lagt til standard `<meta name="mobile-web-app-capable">` ved siden av
+  den Apple-spesifikke taggen (som alene ga en utdatert-advarsel i
+  konsollen). Begge beholdes for best kompatibilitet på tvers av
+  iOS/Android.
+
 ## 0.1.1 — Robusthet i KI-proxyen
 - **Rettet feilnavngitt Cloudflare-hemmelighet**: `wrangler secret put` hadde
   blitt kjørt med selve nøkkelverdien som navn ved en feiltakelse, i stedet
