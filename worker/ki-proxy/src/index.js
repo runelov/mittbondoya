@@ -42,61 +42,82 @@ export default {
       return json({ error: 'Ugyldig eller manglende X-App-Secret.' }, 401, cors);
     }
 
-    let form;
+    // Alt herfra kan i prinsippet kaste en uventet feil (nettverksglipp,
+    // uventet Anthropic-respons, stort bilde som treffer Workerens
+    // CPU-tidsgrense) — fanges her og gis tilbake som JSON i stedet for
+    // Cloudflares uinformative generiske 500-side, slik at appens
+    // "KI-gjenkjenning feilet"-konsoll-logg faktisk viser noe nyttig
+    // (se js/app.js/ki-client.js).
     try {
-      form = await request.formData();
+      let form;
+      try {
+        form = await request.formData();
+      } catch (e) {
+        return json({ error: 'Kunne ikke lese multipart/form-data.' }, 400, cors);
+      }
+
+      const bildeFil = form.get('bilde');
+      if (!bildeFil || typeof bildeFil.arrayBuffer !== 'function') {
+        return json({ error: 'Mangler feltet "bilde".' }, 400, cors);
+      }
+      let kandidater = [];
+      try {
+        kandidater = JSON.parse(form.get('kandidater') || '[]');
+      } catch (e) { /* tom liste er greit */ }
+
+      const buf = await bildeFil.arrayBuffer();
+      const base64 = arrayBufferToBase64(buf);
+      const mediaType = bildeFil.type && bildeFil.type.startsWith('image/') ? bildeFil.type : 'image/jpeg';
+
+      const prompt = buildPrompt(kandidater);
+
+      let anthropicRes;
+      try {
+        anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
+          method: 'POST',
+          headers: {
+            'x-api-key': env.ANTHROPIC_API_KEY,
+            'anthropic-version': '2023-06-01',
+            'content-type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: env.ANTHROPIC_MODEL || 'claude-sonnet-5',
+            max_tokens: 512,
+            messages: [{
+              role: 'user',
+              content: [
+                { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+                { type: 'text', text: prompt },
+              ],
+            }],
+          }),
+        });
+      } catch (e) {
+        return json({ error: `Nettverksfeil mot Anthropic: ${e.message}` }, 502, cors);
+      }
+
+      if (!anthropicRes.ok) {
+        const errText = await anthropicRes.text();
+        return json({ error: `KI-kall feilet (${anthropicRes.status}): ${errText}` }, 502, cors);
+      }
+
+      let anthropicData;
+      try {
+        anthropicData = await anthropicRes.json();
+      } catch (e) {
+        return json({ error: `Kunne ikke tolke Anthropic sitt svar som JSON: ${e.message}` }, 502, cors);
+      }
+
+      const text = (anthropicData.content || []).map(b => b.text || '').join('').trim();
+      const parsed = parseModelJson(text);
+      if (!parsed) {
+        return json({ error: 'Kunne ikke tolke KI-svaret som JSON.', raw: text }, 502, cors);
+      }
+
+      return json({ kandidater: parsed.kandidater || [] }, 200, cors);
     } catch (e) {
-      return json({ error: 'Kunne ikke lese multipart/form-data.' }, 400, cors);
+      return json({ error: `Uventet feil i KI-proxyen: ${e.message}` }, 500, cors);
     }
-
-    const bildeFil = form.get('bilde');
-    if (!bildeFil || typeof bildeFil.arrayBuffer !== 'function') {
-      return json({ error: 'Mangler feltet "bilde".' }, 400, cors);
-    }
-    let kandidater = [];
-    try {
-      kandidater = JSON.parse(form.get('kandidater') || '[]');
-    } catch (e) { /* tom liste er greit */ }
-
-    const buf = await bildeFil.arrayBuffer();
-    const base64 = arrayBufferToBase64(buf);
-    const mediaType = bildeFil.type && bildeFil.type.startsWith('image/') ? bildeFil.type : 'image/jpeg';
-
-    const prompt = buildPrompt(kandidater);
-
-    const anthropicRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: env.ANTHROPIC_MODEL || 'claude-sonnet-5',
-        max_tokens: 512,
-        messages: [{
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-            { type: 'text', text: prompt },
-          ],
-        }],
-      }),
-    });
-
-    if (!anthropicRes.ok) {
-      const errText = await anthropicRes.text();
-      return json({ error: `KI-kall feilet (${anthropicRes.status}): ${errText}` }, 502, cors);
-    }
-
-    const anthropicData = await anthropicRes.json();
-    const text = (anthropicData.content || []).map(b => b.text || '').join('').trim();
-    const parsed = parseModelJson(text);
-    if (!parsed) {
-      return json({ error: 'Kunne ikke tolke KI-svaret som JSON.', raw: text }, 502, cors);
-    }
-
-    return json({ kandidater: parsed.kandidater || [] }, 200, cors);
   },
 };
 

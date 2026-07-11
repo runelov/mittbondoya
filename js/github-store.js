@@ -70,11 +70,14 @@ async function ghRequest(cfg, path, method, body){
 
 // Henter en JSON-fil fra det konfigurerte repoet.
 // Returnerer { data: null, sha: null } hvis filen ikke finnes ennå.
-async function loadFile(path){
+// Henter rått base64-innhold for en vilkårlig fil (JSON eller binær) fra det
+// konfigurerte repoet — delt av loadFile (tekst/JSON) og loadImage (bilder).
+// Returnerer null hvis filen ikke finnes.
+async function fetchRawBase64(path){
   const cfg = getConfig();
   if (!cfg) throw new Error('GitHub-synk er ikke konfigurert.');
   const res = await ghRequest(cfg, path, 'GET');
-  if (res.status === 404) return { data: null, sha: null };
+  if (res.status === 404) return null;
   if (!res.ok) throw new Error(`GitHub API-feil ved henting av ${path} (${res.status}): ${await res.text()}`);
   const json = await res.json();
   let contentB64 = json.content;
@@ -92,8 +95,28 @@ async function loadFile(path){
     const blobJson = await blobRes.json();
     contentB64 = blobJson.content;
   }
-  const content = base64ToUtf8(contentB64.replace(/\n/g, ''));
-  return { data: JSON.parse(content), sha: json.sha };
+  return { base64: contentB64.replace(/\n/g, ''), sha: json.sha };
+}
+
+async function loadFile(path){
+  const raw = await fetchRawBase64(path);
+  if (!raw) return { data: null, sha: null };
+  const content = base64ToUtf8(raw.base64);
+  return { data: JSON.parse(content), sha: raw.sha };
+}
+
+// Henter et bilde (committet via saveImage) og returnerer en blob: URL klar
+// til bruk i en <img src="...">. Kalleren bør kalle URL.revokeObjectURL() når
+// bildet ikke lenger vises, for å unngå at minnet vokser over tid — se
+// openDetail i app.js.
+async function loadImage(path){
+  const raw = await fetchRawBase64(path);
+  if (!raw) throw new Error(`Fant ikke bildet ${path}.`);
+  const byteChars = atob(raw.base64);
+  const bytes = new Uint8Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) bytes[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'image/jpeg' });
+  return URL.createObjectURL(blob);
 }
 
 // Lagrer en JSON-fil til det konfigurerte repoet. Trenger sha fra forrige
@@ -248,7 +271,7 @@ async function getLatestRun(workflowFile, sinceIso){
 
 window.GhStore = {
   getConfig, setConfig, clearConfig, isConfigured,
-  loadFile, saveFile, saveWithRetry, saveImage,
+  loadFile, saveFile, saveWithRetry, saveImage, loadImage,
   loadLocal, saveLocal,
   triggerWorkflow, getLatestRun, detectDefaultBranch
 };

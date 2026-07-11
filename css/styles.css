@@ -207,6 +207,10 @@ body{
   margin-bottom: 12px;
 }
 .scanWrap{ position: relative; overflow: hidden; border-radius: var(--radius-md); }
+.detailImgLoading{
+  display: flex; align-items: center; justify-content: center;
+  height: 160px; background: #f5f5f7; color: var(--ink-soft); font-size: 14px;
+}
 
 .posStatus{
   display: flex; align-items: center; gap: 8px;

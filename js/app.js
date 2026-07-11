@@ -2,6 +2,9 @@
 (function(){
 "use strict";
 
+const APP_VERSION = '0.1.0';
+const APP_BUILD_DATE = '2026-07-11';
+
 const el = id => document.getElementById(id);
 
 let mapCtx = null;
@@ -79,6 +82,7 @@ async function refreshFromRepo(){
 const MAPBOX_TOKEN_KEY = 'mittbondoya-mapbox-token';
 
 function wireSetupPanel(){
+  el('appVersion').textContent = `Mitt Bondøya v${APP_VERSION} (${APP_BUILD_DATE})`;
   const cfg = window.GhStore.getConfig();
   if (cfg) {
     el('ghOwner').value = cfg.owner;
@@ -503,18 +507,35 @@ function renderList(){
 
 // ---------- artsdetaljer ----------
 
-function openDetail(funn){
+let detailImageUrl = null; // object URL for forrige viste bilde — revoke()es før neste, se openDetail
+
+async function openDetail(funn){
   const s = speciesCache.find(sp => sp.latinsk === funn.art?.latinsk) || {};
   const count = nearbyCountFor(funn.art?.norsk || '');
-  el('detailContent').innerHTML = `
-    ${funn.bilde ? '' : ''}
+
+  if (detailImageUrl) { URL.revokeObjectURL(detailImageUrl); detailImageUrl = null; }
+
+  const detailHtml = (bildeHtml) => `
+    ${bildeHtml}
     <h2>${escapeHtml(funn.art?.norsk || 'Ukjent art')}</h2>
     <p><em>${escapeHtml(funn.art?.latinsk || s.latinsk || '')}</em></p>
     ${s.beskrivelse ? `<p>${escapeHtml(s.beskrivelse)}</p>` : ''}
     ${count ? `<p class="hint">Registrert ${count} ganger i nærheten før (Artskart).</p>` : ''}
     <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}</p>
     ${s.artskartUrl ? `<a href="${s.artskartUrl}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}`;
+
+  const kanHenteBilde = funn.bilde && window.GhStore.isConfigured();
+  el('detailContent').innerHTML = detailHtml(kanHenteBilde ? '<div class="previewImg detailImgLoading">Laster bilde …</div>' : '');
   toggleSheet('detailPanel', true);
+
+  if (!kanHenteBilde) return;
+  try {
+    detailImageUrl = await window.GhStore.loadImage(funn.bilde);
+    el('detailContent').innerHTML = detailHtml(`<img src="${detailImageUrl}" class="previewImg" alt="">`);
+  } catch (err) {
+    console.warn('Kunne ikke hente bilde for funn', funn.id, err);
+    el('detailContent').innerHTML = detailHtml('<p class="hint">Kunne ikke laste bildet.</p>');
+  }
 }
 
 // ---------- sheets / UI-hjelpere ----------
