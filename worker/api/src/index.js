@@ -3,12 +3,18 @@ import { corsHeaders } from './lib/cors.js';
 import { json } from './lib/json.js';
 import { beOmLenke, verifiser, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
+import { listFunn, opprettFunn, oppdaterFunn, slettFunn, hentBilde } from './routes/funn.js';
 
 const router = createRouter();
 router.post('/auth/be-om-lenke', beOmLenke);
 router.get('/auth/verifiser', verifiser);
 router.post('/auth/logg-ut', loggUt);
 router.get('/meg', meg);
+router.get('/funn', listFunn);
+router.post('/funn', opprettFunn);
+router.patch('/funn/:id', oppdaterFunn);
+router.delete('/funn/:id', slettFunn);
+router.get('/funn/bilde/:id', hentBilde);
 
 export default {
   async fetch(request, env, ctx) {

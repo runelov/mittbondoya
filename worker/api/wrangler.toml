@@ -15,6 +15,10 @@ database_id = "fcc8265e-0a88-45cb-b474-b0706337edec"
 binding = "RATE_LIMIT"
 id = "43f78af9a2184f3fa272d19bc89edfda"
 
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "bondoya-bilder"
+
 [vars]
 ALLOWED_ORIGIN = "https://bondoya.no"
 ENVIRONMENT = "production"

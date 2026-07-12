@@ -1,5 +1,5 @@
 // js/offline-queue.js
-// IndexedDB-kø for funn registrert uten nett (eller der synk mot data-repoet
+// IndexedDB-kø for funn registrert uten nett (eller der synk mot bondoya-api
 // feilet). Hvert element inneholder bildet som en Blob (aldri base64 i minnet
 // lenger enn nødvendig) + resten av funn-metadataen.
 
@@ -68,13 +68,16 @@ async function queueAll(){
   });
 }
 
-// Prøver å synke alle køede funn til data-repoet. For hvert element: kjør KI
-// hvis art ikke allerede er valgt og en KI-proxy er konfigurert, last opp
-// bildet, legg til i funn.json (med saveWithRetry for samtidighetshåndtering),
+// Prøver å synke alle køede funn til bondoya-api. For hvert element: kjør KI
+// hvis art ikke allerede er valgt og en KI-proxy er konfigurert, opprett
+// funnet (bilde + metadata i samme forespørsel, se ApiClient.opprettFunn),
 // fjern fra køen. Stopper og lar resten stå i køen ved første feil (typisk
-// fortsatt offline) i stedet for å kaste hele batchen.
+// fortsatt offline, eller ikke innlogget) i stedet for å kaste hele batchen.
 async function syncQueue(onProgress){
-  if (!navigator.onLine || !window.GhStore.isConfigured()) return { synket: 0, gjenstår: (await queueAll()).length };
+  if (!navigator.onLine) return { synket: 0, gjenstår: (await queueAll()).length };
+  const bruker = await window.ApiClient.meg().catch(() => null);
+  if (!bruker) return { synket: 0, gjenstår: (await queueAll()).length };
+
   const items = await queueAll();
   let synket = 0;
   for (const item of items) {
@@ -92,25 +95,14 @@ async function syncQueue(onProgress){
         kiAlternativer = kiResultat.alternativer || [];
       }
 
-      const imagePath = `images/${item.localId}.jpg`;
-      if (item.imageBlob) {
-        await window.GhStore.saveImage(imagePath, item.imageBlob);
-      }
-
-      await window.GhStore.saveWithRetry('data/funn.json', (data) => {
-        const funn = data || [];
-        funn.push({
-          id: item.localId,
-          art: art || { norsk: 'Ikke identifisert', latinsk: '' },
-          artstype: item.artstype || (art && art.artstype) || 'annet',
-          lat: item.lat, lon: item.lon,
-          tidspunkt: item.tidspunkt,
-          bilde: item.imageBlob ? imagePath : null,
-          registrertAv: item.registrertAv || '',
-          kiKonfidens: kiKonfidens || 0,
-          kiAlternativer: kiAlternativer || []
-        });
-        return funn;
+      await window.ApiClient.opprettFunn({
+        art: art || { norsk: 'Ikke identifisert', latinsk: '' },
+        artstype: item.artstype || (art && art.artstype) || 'annet',
+        lat: item.lat, lon: item.lon,
+        tidspunkt: item.tidspunkt,
+        imageBlob: item.imageBlob,
+        kiKonfidens: kiKonfidens || 0,
+        kiAlternativer: kiAlternativer || []
       });
 
       await queueRemove(item.localId);

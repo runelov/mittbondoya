@@ -12,6 +12,8 @@ let funnCache = [];
 let speciesCache = [];
 let artskartCache = []; // [{art, taxonId, lat, lon, dato}, ...] fra data/artskart-bondoya.json
 let activeFilter = 'alle';
+let activeVisning = 'alle'; // 'alle' | 'mine' — se wireListPanel
+let brukerCache = null; // {epost, kortnavn, rolle} eller null — satt av sjekkSesjon()
 let pendingImageBlob = null;
 let pendingPosition = null; // {lat, lon}
 let pendingPositionKilde = null; // 'gps' | 'exif' | 'manuell' — vises i UI, se renderRegisterPanel
@@ -24,12 +26,14 @@ let pendingArt = null; // { norsk, latinsk, artstype } — løftet ut av renderR
 // ---------- oppstart ----------
 
 document.addEventListener('DOMContentLoaded', async () => {
-  mapCtx = initMap();
+  mapCtx = await initMapNarKlar();
   window.addEventListener('funn:selected', e => openDetail(e.detail));
 
   await loadSpecies();
+  await sjekkSesjon();
   await refreshFromRepo();
 
+  wireAccountPanel();
   wireSetupPanel();
   wireListPanel();
   wireRegisterFlow();
@@ -45,6 +49,34 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// #map-containeren kan i sjeldne tilfeller ha 0x0 størrelse akkurat idet
+// denne kjører (f.eks. viewport/embedding ikke ferdig lagt ut ennå) —
+// Leaflet sin fitBounds() kaster da "Invalid LatLng", og uten denne
+// beskyttelsen stopper det HELE oppstartskjeden under (innlogging,
+// funnliste, registreringsflyt ville aldri blitt wiret opp). Ett forsøk
+// til på neste animasjonsframe er nok til at containeren har fått en
+// reell størrelse.
+function initMapNarKlar(){
+  return new Promise((resolve) => {
+    try {
+      resolve(initMap());
+    } catch (e) {
+      // setTimeout (ikke requestAnimationFrame) bevisst — rAF suspenderes i
+      // bakgrunnsfaner/skjulte viewports og ville da aldri kjørt, og latt
+      // hele oppstartskjeden henge for alltid på denne await-en.
+      console.warn('Kartinitialisering feilet, prøver på nytt om 100ms', e);
+      setTimeout(() => {
+        try {
+          resolve(initMap());
+        } catch (e2) {
+          console.error('Kartinitialisering feilet igjen, fortsetter uten kart', e2);
+          resolve(null);
+        }
+      }, 100);
+    }
+  });
+}
+
 async function loadSpecies(){
   try {
     const res = await fetch('data/species.json');
@@ -55,26 +87,87 @@ async function loadSpecies(){
   }
 }
 
+// Feiler bevisst aldri (nettverksfeil → behandlet som "ikke innlogget") —
+// resten av appens oppstart (kart, liste, registreringsflyt) må fortsette å
+// wire seg opp selv om bondoya-api er utilgjengelig akkurat nå.
+async function sjekkSesjon(){
+  try {
+    brukerCache = await window.ApiClient.meg();
+  } catch (e) {
+    console.warn('Kunne ikke sjekke innloggingsstatus', e);
+    brukerCache = null;
+  }
+  renderAccountPanel();
+  return brukerCache;
+}
+
 async function refreshFromRepo(){
-  if (!window.GhStore.isConfigured()) {
+  if (!brukerCache) {
+    // Ikke innlogget: vis siste kjente lokale kopi (om noen), ingen tilgang
+    // til bondoya-api ennå — alt er innlogget-only i denne milestonen.
     funnCache = window.GhStore.loadLocal('funn') || [];
-    renderFinds(mapCtx.findsLayer, funnCache, activeFilter);
+    renderFindsPaKart();
     renderList();
     return;
   }
   try {
-    const [{ data: funn }, artskart] = await Promise.all([
-      window.GhStore.loadFile('data/funn.json'),
-      window.GhStore.loadFile('data/artskart-bondoya.json').catch(() => ({ data: null }))
-    ]);
-    funnCache = funn || [];
-    artskartCache = (artskart && artskart.data) || [];
+    funnCache = await window.ApiClient.hentFunn();
     window.GhStore.saveLocal('funn', funnCache);
-    renderFinds(mapCtx.findsLayer, funnCache, activeFilter);
-    renderList();
   } catch (e) {
     showToast('Kunne ikke hente funn: ' + e.message);
+    return;
   }
+  // Artskart-berikelse er fortsatt et eget, valgfritt GitHub-basert
+  // datakilde (se setupPanel) — frikoblet fra selve funn-lastingen over,
+  // uendret siden MVP.
+  if (window.GhStore.isConfigured()) {
+    try {
+      const { data } = await window.GhStore.loadFile('data/artskart-bondoya.json');
+      artskartCache = data || [];
+    } catch {
+      artskartCache = [];
+    }
+  }
+  renderFindsPaKart();
+  renderList();
+}
+
+// ---------- konto / innlogging ----------
+
+function wireAccountPanel(){
+  el('accountToggle').addEventListener('click', () => toggleSheet('accountPanel'));
+
+  el('loginSendBtn').addEventListener('click', async () => {
+    const epost = el('loginEpost').value.trim();
+    if (!epost) { el('loginNote').textContent = 'Skriv inn e-posten din.'; return; }
+    const turnstileToken = (window.turnstile && window.turnstile.getResponse()) || '';
+    el('loginNote').textContent = 'Sender …';
+    try {
+      const res = await window.ApiClient.beOmLenke(epost, turnstileToken);
+      el('loginNote').textContent = res.melding;
+    } catch (e) {
+      el('loginNote').textContent = 'Feil: ' + e.message;
+    } finally {
+      if (window.turnstile && window.turnstile.reset) window.turnstile.reset();
+    }
+  });
+
+  el('loggUtBtn').addEventListener('click', async () => {
+    await window.ApiClient.loggUt();
+    brukerCache = null;
+    renderAccountPanel();
+    toggleSheet('accountPanel', false);
+    showToast('Logget ut.');
+    await refreshFromRepo();
+  });
+
+  renderAccountPanel();
+}
+
+function renderAccountPanel(){
+  el('accountLoggedOut').hidden = !!brukerCache;
+  el('accountLoggedInn').hidden = !brukerCache;
+  if (brukerCache) el('accountKortnavn').textContent = brukerCache.kortnavn;
 }
 
 // ---------- setup-panel ----------
@@ -126,14 +219,14 @@ function wireSetupPanel(){
   el('ghDisconnectBtn').addEventListener('click', () => {
     window.GhStore.clearConfig();
     el('ghToken').value = '';
-    el('ghNote').textContent = 'Koblet fra. Funn vises kun lokalt nå.';
+    el('ghNote').textContent = 'Koblet fra. Artskart-baserte artsforslag er nå avslått.';
     refreshFromRepo();
   });
 }
 
 function updateSyncPill(){
   const pill = el('syncStatus');
-  if (!window.GhStore.isConfigured()) { pill.hidden = true; return; }
+  if (!brukerCache) { pill.hidden = true; return; }
   pill.hidden = false;
   pill.textContent = navigator.onLine ? '🟢 Tilkoblet' : '🟡 Offline';
 }
@@ -149,7 +242,7 @@ async function trySync(){
 async function renderQueueBadge(){
   const items = await window.OfflineQueue.queueAll();
   const pill = el('syncStatus');
-  if (items.length > 0 && window.GhStore.isConfigured()) {
+  if (items.length > 0 && brukerCache) {
     pill.hidden = false;
     pill.textContent = `⏳ ${items.length} venter på synk`;
   }
@@ -191,6 +284,11 @@ function wireRegisterFlow(){
 // — nåværende GPS-posisjon ville vært feil, så brukeren MÅ velge posisjon i
 // kartet i stedet (se pickPositionOnMap/renderRegisterPanel).
 function startRegistration(fraGalleri){
+  if (!brukerCache) {
+    showToast('Logg inn for å registrere funn.');
+    toggleSheet('accountPanel', true);
+    return;
+  }
   pendingImageBlob = null;
   pendingPosition = null;
   pendingPositionKilde = null;
@@ -210,6 +308,7 @@ function startRegistration(fraGalleri){
 }
 
 function pickPositionOnMap(){
+  if (!mapCtx) { showToast('Kartet er ikke tilgjengelig akkurat nå.'); return; }
   toggleSheet('registerPanel', false);
   showToast('Trykk i kartet der bildet ble tatt');
   mapCtx.map.once('click', (e) => {
@@ -439,26 +538,15 @@ async function saveFind(art){
   const entry = {
     art, artstype: art.artstype, lat: pos.lat, lon: pos.lon,
     tidspunkt: (pendingTimestamp || new Date()).toISOString(), imageBlob: pendingImageBlob,
-    registrertAv: ''
+    kiKonfidens: pendingKiResultat && pendingKiResultat.beste ? pendingKiResultat.beste.konfidens : 0,
+    kiAlternativer: (pendingKiResultat && pendingKiResultat.alternativer) || []
   };
 
   toggleSheet('registerPanel', false);
 
-  if (navigator.onLine && window.GhStore.isConfigured()) {
+  if (navigator.onLine && brukerCache) {
     try {
-      const imagePath = `images/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      await window.GhStore.saveImage(imagePath, pendingImageBlob);
-      await window.GhStore.saveWithRetry('data/funn.json', (data) => {
-        const funn = data || [];
-        funn.push({
-          id: imagePath, art: entry.art, artstype: entry.artstype,
-          lat: entry.lat, lon: entry.lon, tidspunkt: entry.tidspunkt,
-          bilde: imagePath, registrertAv: entry.registrertAv,
-          kiKonfidens: pendingKiResultat && pendingKiResultat.beste ? pendingKiResultat.beste.konfidens : 0,
-          kiAlternativer: (pendingKiResultat && pendingKiResultat.alternativer) || []
-        });
-        return funn;
-      });
+      await window.ApiClient.opprettFunn(entry);
       showToast('Funn registrert ✓');
       await refreshFromRepo();
       return;
@@ -476,6 +564,20 @@ async function saveFind(art){
 
 function wireListPanel(){
   el('listToggle').addEventListener('click', () => { renderList(); toggleSheet('listPanel'); });
+
+  const visninger = ['alle', 'mine'];
+  el('visningRow').innerHTML = visninger.map(v =>
+    `<button class="filterChip${v===activeVisning?' active':''}" data-v="${v}">${v === 'mine' ? 'Mine funn' : 'Alle funn'}</button>`
+  ).join('');
+  el('visningRow').querySelectorAll('.filterChip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      activeVisning = btn.dataset.v;
+      el('visningRow').querySelectorAll('.filterChip').forEach(b => b.classList.toggle('active', b === btn));
+      renderFindsPaKart();
+      renderList();
+    });
+  });
+
   const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
   el('filterRow').innerHTML = artstyper.map(t =>
     `<button class="filterChip${t===activeFilter?' active':''}" data-t="${t}">${t}</button>`
@@ -484,59 +586,151 @@ function wireListPanel(){
     btn.addEventListener('click', () => {
       activeFilter = btn.dataset.t;
       el('filterRow').querySelectorAll('.filterChip').forEach(b => b.classList.toggle('active', b === btn));
-      renderFinds(mapCtx.findsLayer, funnCache, activeFilter);
+      renderFindsPaKart();
       renderList();
     });
   });
 }
 
+function synligeFunn(){
+  return funnCache.filter(f =>
+    (activeFilter === 'alle' || f.artstype === activeFilter) &&
+    (activeVisning === 'alle' || f.erEgenRegistrering)
+  );
+}
+
+// mapCtx kan være null i det (svært sjeldne) tilfellet kartinitialisering
+// feilet permanent, se initMapNarKlar() — resten av appen (innlogging,
+// liste, registrering) skal likevel fungere, bare uten kartvisning.
+function renderFindsPaKart(){
+  if (mapCtx) renderFinds(mapCtx.findsLayer, synligeFunn(), 'alle');
+}
+
 function renderList(){
-  const list = funnCache.filter(f => activeFilter === 'alle' || f.artstype === activeFilter);
+  const list = synligeFunn();
   el('findList').innerHTML = list.map(f => `
     <button class="findRow" data-id="${f.id}">
       <strong>${escapeHtml(f.art?.norsk || 'Ukjent')}</strong>
-      <span class="hint">${new Date(f.tidspunkt).toLocaleDateString('no-NO')}</span>
+      <span class="hint">${new Date(f.tidspunkt).toLocaleDateString('no-NO')}${f.registrertAv ? ' · ' + escapeHtml(f.registrertAv) : ''}</span>
     </button>`).join('') || '<p class="hint">Ingen registrerte funn ennå.</p>';
   el('findList').querySelectorAll('.findRow').forEach(btn => {
     btn.addEventListener('click', () => {
-      const f = funnCache.find(x => x.id === btn.dataset.id);
-      if (f) { toggleSheet('listPanel', false); panToFind(mapCtx.map, f); openDetail(f); }
+      const f = funnCache.find(x => String(x.id) === btn.dataset.id);
+      if (f) { toggleSheet('listPanel', false); if (mapCtx) panToFind(mapCtx.map, f); openDetail(f); }
     });
   });
 }
 
 // ---------- artsdetaljer ----------
 
-let detailImageUrl = null; // object URL for forrige viste bilde — revoke()es før neste, se openDetail
-
+// Bildet vises direkte via <img src>, ikke fetch+blob+objectURL — sesjons-
+// cookien sendes automatisk (samme site, se api-client.js sin bildeUrl()).
 async function openDetail(funn){
   const s = speciesCache.find(sp => sp.latinsk === funn.art?.latinsk) || {};
   const count = nearbyCountFor(funn.art?.norsk || '');
 
-  if (detailImageUrl) { URL.revokeObjectURL(detailImageUrl); detailImageUrl = null; }
+  const bildeHtml = funn.bildeUrl
+    ? `<img src="${window.ApiClient.bildeUrl(funn.id)}" class="previewImg" alt="">`
+    : '';
 
-  const detailHtml = (bildeHtml) => `
+  el('detailContent').innerHTML = `
     ${bildeHtml}
     <h2>${escapeHtml(funn.art?.norsk || 'Ukjent art')}</h2>
     <p><em>${escapeHtml(funn.art?.latinsk || s.latinsk || '')}</em></p>
     ${rodlisteBadge(s.rodlisteNorge)}
     ${s.beskrivelse ? `<p>${escapeHtml(s.beskrivelse)}</p>` : ''}
     ${count ? `<p class="hint">Registrert ${count} ganger i nærheten før (Artskart).</p>` : ''}
-    <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}</p>
-    ${s.artskartUrl ? `<a href="${s.artskartUrl}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}`;
-
-  const kanHenteBilde = funn.bilde && window.GhStore.isConfigured();
-  el('detailContent').innerHTML = detailHtml(kanHenteBilde ? '<div class="previewImg detailImgLoading">Laster bilde …</div>' : '');
+    <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}${funn.registrertAv ? ' av ' + escapeHtml(funn.registrertAv) : ''}</p>
+    ${s.artskartUrl ? `<a href="${s.artskartUrl}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}
+    ${funn.erEgenRegistrering ? `
+      <div class="sheetActions">
+        <button id="redigerFunnBtn" class="secondaryBtn">Rediger</button>
+        <button id="slettFunnBtn" class="secondaryBtn">Slett</button>
+      </div>
+      <div id="redigerFunnForm" hidden></div>` : ''}`;
   toggleSheet('detailPanel', true);
 
-  if (!kanHenteBilde) return;
-  try {
-    detailImageUrl = await window.GhStore.loadImage(funn.bilde);
-    el('detailContent').innerHTML = detailHtml(`<img src="${detailImageUrl}" class="previewImg" alt="">`);
-  } catch (err) {
-    console.warn('Kunne ikke hente bilde for funn', funn.id, err);
-    el('detailContent').innerHTML = detailHtml('<p class="hint">Kunne ikke laste bildet.</p>');
-  }
+  if (!funn.erEgenRegistrering) return;
+
+  el('redigerFunnBtn').addEventListener('click', () => renderRedigerFunnSkjema(funn));
+  el('slettFunnBtn').addEventListener('click', async () => {
+    if (!confirm(`Slette funnet «${funn.art?.norsk || 'Ukjent'}»? Dette kan ikke angres.`)) return;
+    try {
+      await window.ApiClient.slettFunn(funn.id);
+      showToast('Funn slettet.');
+      toggleSheet('detailPanel', false);
+      await refreshFromRepo();
+    } catch (e) {
+      showToast('Kunne ikke slette: ' + e.message);
+    }
+  });
+}
+
+const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
+
+// Setter tekstverdier via .value-egenskapen i stedet for å interpolere dem inn
+// i value="..."-attributter i markup — et artsnavn kan være fri tekst (se
+// fritekst-fallbacken i speciesSearch), og escapeHtml() gjør strengen trygg
+// som HTML-INNHOLD, ikke som HTML-ATTRIBUTT (anførselstegn slipper fortsatt
+// gjennom og ville brutt ut av value="..."). .value-tilordning unngår
+// HTML-parsing av verdien helt.
+function renderRedigerFunnSkjema(funn){
+  const container = el('redigerFunnForm');
+  container.hidden = false;
+  container.innerHTML = `
+    <label for="redigerArtNorsk">Art (norsk)</label>
+    <input id="redigerArtNorsk" type="text">
+    <label for="redigerArtLatinsk">Art (latinsk, valgfritt)</label>
+    <input id="redigerArtLatinsk" type="text">
+    <label for="redigerArtstype">Artstype</label>
+    <select id="redigerArtstype">
+      ${REDIGERBARE_ARTSTYPER.map(t => `<option value="${t}">${t}</option>`).join('')}
+    </select>
+    <label for="redigerLat">Breddegrad</label>
+    <input id="redigerLat" type="number" step="any">
+    <label for="redigerLon">Lengdegrad</label>
+    <input id="redigerLon" type="number" step="any">
+    <label for="redigerTidspunkt">Tidspunkt</label>
+    <input id="redigerTidspunkt" type="datetime-local">
+    <div class="sheetActions">
+      <button id="lagreRedigertBtn" class="primaryBtn">Lagre</button>
+      <button id="avbrytRedigertBtn" class="secondaryBtn">Avbryt</button>
+    </div>
+    <p id="redigerNote" class="note"></p>`;
+
+  el('redigerArtNorsk').value = funn.art?.norsk || '';
+  el('redigerArtLatinsk').value = funn.art?.latinsk || '';
+  el('redigerArtstype').value = funn.artstype;
+  el('redigerLat').value = funn.lat;
+  el('redigerLon').value = funn.lon;
+  el('redigerTidspunkt').value = toDatetimeLocalValue(new Date(funn.tidspunkt));
+
+  el('avbrytRedigertBtn').addEventListener('click', () => { container.hidden = true; container.innerHTML = ''; });
+  el('lagreRedigertBtn').addEventListener('click', async () => {
+    const artNorsk = el('redigerArtNorsk').value.trim();
+    if (!artNorsk) { el('redigerNote').textContent = 'Art (norsk navn) mangler.'; return; }
+    const lat = parseFloat(el('redigerLat').value);
+    const lon = parseFloat(el('redigerLon').value);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) { el('redigerNote').textContent = 'Ugyldig posisjon.'; return; }
+
+    const felter = {
+      art_norsk: artNorsk,
+      art_latinsk: el('redigerArtLatinsk').value.trim(),
+      art_taxon_id: funn.art?.taxonId,
+      artstype: el('redigerArtstype').value,
+      lat, lon,
+      tidspunkt: new Date(el('redigerTidspunkt').value).toISOString()
+    };
+    el('redigerNote').textContent = 'Lagrer …';
+    try {
+      const oppdatert = await window.ApiClient.oppdaterFunn(funn.id, felter);
+      showToast('Funn oppdatert ✓');
+      await refreshFromRepo();
+      openDetail(oppdatert);
+    } catch (e) {
+      el('redigerNote').textContent = 'Feil: ' + e.message;
+    }
+  });
 }
 
 // Norsk Rødliste 2021-kode -> lesbar norsk tekst + alvorlighetsklasse for
@@ -557,7 +751,7 @@ function rodlisteBadge(kode){
 function toggleSheet(id, force){
   const sheet = el(id);
   const show = force !== undefined ? force : sheet.hidden;
-  ['setupPanel','listPanel','detailPanel','registerPanel'].forEach(other => {
+  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel'].forEach(other => {
     if (other !== id) el(other).hidden = true;
   });
   sheet.hidden = !show;

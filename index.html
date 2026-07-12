@@ -22,17 +22,39 @@
 <div id="map"></div>
 
 <header id="topBar">
+  <button id="accountToggle" class="iconBtn" aria-label="Konto" title="Konto">👤</button>
   <button id="setupToggle" class="iconBtn" aria-label="Innstillinger" title="Innstillinger">⚙️</button>
   <div id="syncStatus" class="pill" hidden></div>
   <button id="listToggle" class="iconBtn" aria-label="Funnliste" title="Funnliste">📋</button>
 </header>
 
-<!-- Setup / tilkobling til data-repo -->
+<!-- Konto / innlogging (magic-link mot bondoya-api) -->
+<div id="accountPanel" class="sheet" hidden>
+  <div class="sheetHandle"></div>
+  <h2>Konto</h2>
+  <div id="accountLoggedOut">
+    <p class="hint">Skriv inn e-posten din, så sender vi deg en innloggingslenke. Du må være invitert fra før for at dette skal fungere.</p>
+    <label for="loginEpost">E-post</label>
+    <input id="loginEpost" type="email" autocomplete="email" placeholder="din@epost.no">
+    <div class="cf-turnstile" id="turnstileWidget" data-sitekey="0x4AAAAAAD0CP4TI_K966Yw7"></div>
+    <div class="sheetActions">
+      <button id="loginSendBtn" class="primaryBtn">Send innloggingslenke</button>
+    </div>
+    <p id="loginNote" class="note"></p>
+  </div>
+  <div id="accountLoggedInn" hidden>
+    <p>Logget inn som <strong id="accountKortnavn"></strong></p>
+    <button id="loggUtBtn" class="secondaryBtn">Logg ut</button>
+  </div>
+</div>
+
+<!-- Setup: KI-proxy/Mapbox, samt valgfri tilkobling til det private artskart-berikelsesrepoet -->
 <div id="setupPanel" class="sheet" hidden>
   <div class="sheetHandle"></div>
-  <h2>Koble til datarepo</h2>
+  <h2>Innstillinger</h2>
   <p class="hint" id="appVersion"></p>
-  <p class="hint">Lim inn tokenet du har fått delt. Det lagres kun på denne enheten.</p>
+  <p class="hint">Artskart-berikelse (valgfritt): stedsforankrede artsforslag hentes fra et
+    privat repo. Trengs ikke for å registrere eller se funn — kun for bedre artsforslag.</p>
   <label for="ghOwner">Eier</label>
   <input id="ghOwner" type="text" value="runelov" autocomplete="off">
   <label for="ghRepo">Repo</label>
@@ -56,6 +78,7 @@
 <div id="listPanel" class="sheet" hidden>
   <div class="sheetHandle"></div>
   <h2>Registrerte funn</h2>
+  <div id="visningRow" class="filterRow"></div>
   <div id="filterRow" class="filterRow"></div>
   <div id="findList" class="findList"></div>
 </div>
@@ -96,7 +119,9 @@
   integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 <!-- exifr: leser EXIF GPS/dato fra bilder valgt fra kamerarullen (etterregistrering), se onImageCaptured i app.js -->
 <script src="https://unpkg.com/exifr@7.1.3/dist/lite.umd.js"></script>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <script src="js/github-store.js"></script>
+<script src="js/api-client.js"></script>
 <script src="js/offline-queue.js"></script>
 <script src="js/ki-client.js"></script>
 <script src="js/map.js"></script>
