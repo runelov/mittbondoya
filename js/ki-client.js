@@ -9,6 +9,16 @@ const KI_PROXY_URL_KEY = 'bondoya-ki-proxy-url';
 const KI_SHARED_SECRET_KEY = 'bondoya-ki-shared-secret';
 const KONFIDENS_AUTO_TERSKEL = 0.75; // over dette: velg automatisk. Under: vis alternativer.
 
+// Engangs-migrering: api.bondoya.no eies nå av den nye API-workeren, ikke
+// lenger KI-proxyen (som flyttet til ki.bondoya.no). Uten dette måtte alle
+// 10-15 brukere manuelt oppdatert ⚙️-panelet sitt. Kjøres ved innlasting.
+(function migrerGammelKiProxyUrl(){
+  const lagret = localStorage.getItem(KI_PROXY_URL_KEY) || '';
+  if (lagret.startsWith('https://api.bondoya.no')) {
+    localStorage.setItem(KI_PROXY_URL_KEY, lagret.replace('https://api.bondoya.no', 'https://ki.bondoya.no'));
+  }
+})();
+
 function getProxyUrl(){
   return localStorage.getItem(KI_PROXY_URL_KEY) || '';
 }
