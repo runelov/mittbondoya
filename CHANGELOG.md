@@ -1,5 +1,20 @@
 # Endringslogg
 
+## 0.8.0 — Admin-dashboard
+Siste punkt i fase 3-listen: et enkelt bruksstatistikk-dashboard for admin,
+åpnet via en ny "📊 Dashboard"-knapp øverst i adminpanelet. Nytt endepunkt
+`GET /admin/dashboard` aggregerer eksisterende D1-data (ingen ny migrasjon):
+brukere (totalt/aktive/deaktiverte/admin), funn (totalt/denne måneden/
+offentlig synlig/per artstype/topp 5 bidragsytere), sider
+(totalt/publisert/kladd), invitasjoner (totalt/brukt/ubrukt-gyldig/utløpt),
+og antall skjulte arter. Vises som enkle stat-kort (`.statGrid`/`.statCard`
+i `css/styles.css`), ingen graf-bibliotek — kun tellinger, ikke tidsserier.
+
+Kostnadsbilde per tjeneste (Cloudflare/Mapbox/Anthropic), nevnt som "hvis
+mulig" i konsept.md, er bevisst utelatt denne runden — avklart med
+produkteier, ville krevd egne faktureringsAPI-hemmeligheter og en egen
+sikkerhetsvurdering.
+
 ## 0.7.0 — Artssynlighet admin-override
 Admin kan nå skjule/vise arter fra det offentlige laget selv, uten kodeendring
 eller deploy — flytter "Arter & synlighet" (konsept.md) fra en hardkodet

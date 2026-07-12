@@ -9,6 +9,7 @@ import {
   listAdminSider, opprettSide, oppdaterSide, slettSide,
   listInvitasjoner, opprettInvitasjon, slettInvitasjon,
   listSkjulteArter, skjulArt, visArtIgjen,
+  hentDashboard,
 } from './routes/admin.js';
 import { listFunnOffentlig, hentOffentligInnstillinger } from './routes/offentlig.js';
 import { hentFlis } from './routes/tiles.js';
@@ -47,6 +48,7 @@ router.delete('/admin/invitasjoner/:id', slettInvitasjon);
 router.get('/admin/skjulte-arter', listSkjulteArter);
 router.post('/admin/skjulte-arter', skjulArt);
 router.delete('/admin/skjulte-arter/:taxonId', visArtIgjen);
+router.get('/admin/dashboard', hentDashboard);
 
 export default {
   async fetch(request, env, ctx) {

@@ -257,6 +257,12 @@ async function visArtIgjen(taxonId) {
   }
 }
 
+async function hentAdminDashboard() {
+  const res = await kall('/admin/dashboard');
+  if (!res.ok) throw new Error(`Kunne ikke hente dashboard (${res.status}).`);
+  return res.json();
+}
+
 // Bildet vises via <img src="...">, ikke fetch+blob: sesjonscookien er
 // SameSite=Lax og bondoya.no→api.bondoya.no er samme site (ulikt opphav),
 // så den sendes automatisk med et vanlig <img>-kall — samme resonnement som
@@ -302,4 +308,5 @@ window.ApiClient = {
   hentAdminSkjulteArter,
   skjulArt,
   visArtIgjen,
+  hentAdminDashboard,
 };

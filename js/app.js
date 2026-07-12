@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.7.0';
+const APP_VERSION = '0.8.0';
 const APP_BUILD_DATE = '2026-07-12';
 
 const el = id => document.getElementById(id);
@@ -42,6 +42,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireListPanel();
   wireRegisterFlow();
   wireInviterPanel();
+  wireDashboardPanel();
   wireSheetDismiss();
 
   await haandterInvitasjonFraUrl();
@@ -328,6 +329,67 @@ function wireAdminPanel(){
       el('artAdminNote').textContent = 'Feil: ' + e.message;
     }
   });
+}
+
+// ---------- admin: dashboard ----------
+
+function wireDashboardPanel(){
+  el('dashboardApneBtn').addEventListener('click', async () => {
+    toggleSheet('dashboardPanel', true);
+    await renderAdminDashboard();
+  });
+}
+
+function statKort(tall, etikett){
+  return `<div class="statCard"><div class="statTall">${tall}</div><div class="statLabel">${escapeHtml(etikett)}</div></div>`;
+}
+
+async function renderAdminDashboard(){
+  const container = el('dashboardInnhold');
+  container.innerHTML = '<p class="hint">Laster …</p>';
+  let d;
+  try {
+    d = await window.ApiClient.hentAdminDashboard();
+  } catch (e) {
+    container.innerHTML = `<p class="hint">Kunne ikke hente dashboard: ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  const artstypeListe = d.funn.perArtstype.map((r) => `<li>${escapeHtml(r.artstype)}: ${r.antall}</li>`).join('') || '<li>Ingen funn ennå.</li>';
+  const bidragsytereListe = d.funn.toppBidragsytere.map((r) => `<li>${escapeHtml(r.kortnavn)}: ${r.antall}</li>`).join('') || '<li>Ingen funn ennå.</li>';
+
+  container.innerHTML = `
+    <h3>Brukere</h3>
+    <div class="statGrid">
+      ${statKort(d.brukere.totalt, 'Totalt')}
+      ${statKort(d.brukere.aktive, 'Aktive')}
+      ${statKort(d.brukere.deaktiverte, 'Deaktiverte')}
+      ${statKort(d.brukere.admins, 'Admin')}
+    </div>
+    <h3>Funn</h3>
+    <div class="statGrid">
+      ${statKort(d.funn.totalt, 'Totalt')}
+      ${statKort(d.funn.denneManeden, 'Denne måneden')}
+      ${statKort(d.funn.offentligSynlig, 'Offentlig synlig')}
+      ${statKort(d.skjulteArter, 'Skjulte arter')}
+    </div>
+    <p class="hint"><strong>Per artstype:</strong></p>
+    <ul>${artstypeListe}</ul>
+    <p class="hint"><strong>Topp bidragsytere:</strong></p>
+    <ul>${bidragsytereListe}</ul>
+    <h3>Sider</h3>
+    <div class="statGrid">
+      ${statKort(d.sider.totalt, 'Totalt')}
+      ${statKort(d.sider.publisert, 'Publisert')}
+      ${statKort(d.sider.kladd, 'Kladd')}
+    </div>
+    <h3>Invitasjoner</h3>
+    <div class="statGrid">
+      ${statKort(d.invitasjoner.totalt, 'Totalt generert')}
+      ${statKort(d.invitasjoner.brukt, 'Brukt')}
+      ${statKort(d.invitasjoner.ubruktGyldig, 'Ubrukt, gyldig')}
+      ${statKort(d.invitasjoner.utlopt, 'Utløpt')}
+    </div>`;
 }
 
 async function renderInnstillinger(){
@@ -1227,7 +1289,7 @@ function rodlisteBadge(kode){
 function toggleSheet(id, force){
   const sheet = el(id);
   const show = force !== undefined ? force : sheet.hidden;
-  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel','adminPanel','sidePanel','inviterPanel'].forEach(other => {
+  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel','adminPanel','sidePanel','inviterPanel','dashboardPanel'].forEach(other => {
     if (other !== id) el(other).hidden = true;
   });
   sheet.hidden = !show;

@@ -188,6 +188,17 @@ body{
 .secondaryBtn{ background: #f0f0f2; color: var(--ink); }
 .primaryBtn:active, .secondaryBtn:active{ transform: scale(0.97); }
 
+/* ---------- dashboard stat-kort ---------- */
+
+.statGrid{ display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.statCard{
+  background: #f5f5f7;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+.statCard .statTall{ font-size: 28px; font-weight: 700; line-height: 1.1; }
+.statCard .statLabel{ color: var(--ink-soft); font-size: 13px; margin-top: 2px; }
+
 /* ---------- filter chips ---------- */
 
 .filterRow{ display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }

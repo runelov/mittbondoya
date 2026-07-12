@@ -310,3 +310,78 @@ export async function visArtIgjen({ request, env, params }) {
 
   return new Response(null, { status: 204, headers: cors });
 }
+
+// Ren lesing/aggregering av eksisterende tabeller — ingen ny migrasjon.
+// Kun bruksstatistikk (avklart med produkteier); kostnadsbilde per tjeneste
+// (Cloudflare/Mapbox/Anthropic, nevnt som "hvis mulig" i konsept.md) er
+// bevisst utelatt — ville krevd egne faktureringsAPI-hemmeligheter.
+export async function hentDashboard({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const now = Date.now();
+  const naa = new Date();
+  // tidspunkt er alltid en ISO 8601 UTC-streng (se migrations/0002) — trygt
+  // å sammenligne leksikografisk mot en annen ISO-streng.
+  const starenAvManeden = new Date(Date.UTC(naa.getUTCFullYear(), naa.getUTCMonth(), 1)).toISOString();
+
+  const [
+    brukerTelling,
+    funnTelling,
+    funnPerArtstype,
+    toppBidragsytere,
+    siderPerStatus,
+    invitasjonTelling,
+    skjulteArterTelling,
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT COUNT(*) AS totalt,
+              COALESCE(SUM(CASE WHEN status = 'aktiv' THEN 1 ELSE 0 END), 0) AS aktive,
+              COALESCE(SUM(CASE WHEN status = 'deaktivert' THEN 1 ELSE 0 END), 0) AS deaktiverte,
+              COALESCE(SUM(CASE WHEN rolle = 'admin' THEN 1 ELSE 0 END), 0) AS admins
+       FROM brukere WHERE slettet_tidspunkt IS NULL`
+    ).first(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS totalt,
+              COALESCE(SUM(CASE WHEN tidspunkt >= ?1 THEN 1 ELSE 0 END), 0) AS denneManeden,
+              COALESCE(SUM(CASE WHEN synlig_for_public = 1 THEN 1 ELSE 0 END), 0) AS offentligSynlig
+       FROM funn`
+    ).bind(starenAvManeden).first(),
+    env.DB.prepare('SELECT artstype, COUNT(*) AS antall FROM funn GROUP BY artstype ORDER BY antall DESC').all(),
+    env.DB.prepare(
+      `SELECT registrert_av_kortnavn AS kortnavn, COUNT(*) AS antall
+       FROM funn GROUP BY registrert_av_bruker_id ORDER BY antall DESC LIMIT 5`
+    ).all(),
+    env.DB.prepare('SELECT status, COUNT(*) AS antall FROM sider GROUP BY status').all(),
+    env.DB.prepare(
+      `SELECT COUNT(*) AS totalt,
+              COALESCE(SUM(CASE WHEN brukt = 1 THEN 1 ELSE 0 END), 0) AS brukt,
+              COALESCE(SUM(CASE WHEN brukt = 0 AND utloper > ?1 THEN 1 ELSE 0 END), 0) AS ubruktGyldig,
+              COALESCE(SUM(CASE WHEN brukt = 0 AND utloper <= ?1 THEN 1 ELSE 0 END), 0) AS utlopt
+       FROM invitasjoner`
+    ).bind(now).first(),
+    env.DB.prepare('SELECT COUNT(*) AS totalt FROM skjulte_arter').first(),
+  ]);
+
+  const sidePublisert = siderPerStatus.results.find((r) => r.status === 'publisert')?.antall || 0;
+  const sideKladd = siderPerStatus.results.find((r) => r.status === 'kladd')?.antall || 0;
+
+  return json(
+    {
+      brukere: brukerTelling,
+      funn: {
+        totalt: funnTelling.totalt,
+        denneManeden: funnTelling.denneManeden,
+        offentligSynlig: funnTelling.offentligSynlig,
+        perArtstype: funnPerArtstype.results,
+        toppBidragsytere: toppBidragsytere.results,
+      },
+      sider: { totalt: sidePublisert + sideKladd, publisert: sidePublisert, kladd: sideKladd },
+      invitasjoner: invitasjonTelling,
+      skjulteArter: skjulteArterTelling.totalt,
+    },
+    200,
+    cors
+  );
+}
