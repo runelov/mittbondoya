@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.5.0';
+const APP_VERSION = '0.6.0';
 const APP_BUILD_DATE = '2026-07-12';
 
 const el = id => document.getElementById(id);
@@ -24,6 +24,7 @@ let pendingKiResultat = null;
 let pendingArt = null; // { norsk, latinsk, artstype } — løftet ut av renderRegisterPanel sin
 // lokale closure-variabel, ellers nullstilles et manuelt artsvalg hver gang
 // panelet re-rendres (f.eks. etter at posisjon velges i kart), se pickPositionOnMap.
+let inviterToken = null; // satt av haandterInvitasjonFraUrl() hvis ?inviter=... er gyldig
 
 // ---------- oppstart ----------
 
@@ -40,7 +41,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   wireSetupPanel();
   wireListPanel();
   wireRegisterFlow();
+  wireInviterPanel();
   wireSheetDismiss();
+
+  await haandterInvitasjonFraUrl();
 
   window.addEventListener('online', () => { updateSyncPill(); trySync(); });
   window.addEventListener('offline', updateSyncPill);
@@ -224,6 +228,7 @@ function wireAdminPanel(){
       await renderInnstillinger();
       tomSideSkjema();
       await renderAdminSider();
+      await renderAdminInvitasjoner();
       await renderBrukerListe();
     }
   });
@@ -264,6 +269,30 @@ function wireAdminPanel(){
       await renderAdminSider();
     } catch (e) {
       el('sideAdminNote').textContent = 'Feil: ' + e.message;
+    }
+  });
+
+  el('invitasjonGenererBtn').addEventListener('click', async () => {
+    el('invitasjonGenererBtn').disabled = true;
+    try {
+      const { token } = await window.ApiClient.opprettInvitasjon();
+      const lenke = `${location.origin}${location.pathname}?inviter=${token}`;
+      el('invitasjonLenkeInput').value = lenke;
+      el('invitasjonNyLenke').hidden = false;
+      await renderAdminInvitasjoner();
+    } catch (e) {
+      showToast('Feil: ' + e.message);
+    } finally {
+      el('invitasjonGenererBtn').disabled = false;
+    }
+  });
+
+  el('invitasjonKopierBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(el('invitasjonLenkeInput').value);
+      showToast('Lenke kopiert.');
+    } catch (e) {
+      showToast('Kunne ikke kopiere — merk og kopier lenken manuelt.');
     }
   });
 }
@@ -393,6 +422,100 @@ function renderSideInnhold(innhold){
   return innhold.split(/\n{2,}/).map((avsnitt) =>
     `<p>${escapeHtml(avsnitt).replace(/\n/g, '<br>')}</p>`
   ).join('');
+}
+
+// ---------- invitasjon (registrering via lenke) ----------
+
+function wireInviterPanel(){
+  el('inviterRegistrerBtn').addEventListener('click', async () => {
+    const kortnavn = el('inviterKortnavnInput').value.trim();
+    const epost = el('inviterEpostInput').value.trim();
+    if (!kortnavn || !epost) { el('inviterNote').textContent = 'Fyll ut både kortnavn og e-post.'; return; }
+
+    el('inviterNote').textContent = 'Registrerer …';
+    try {
+      await window.ApiClient.registrerMedInvitasjon(inviterToken, { kortnavn, epost });
+      toggleSheet('inviterPanel', false);
+      showToast(`Velkommen, ${kortnavn}!`);
+      await sjekkSesjon();
+      await refreshFromRepo();
+    } catch (e) {
+      el('inviterNote').textContent = 'Feil: ' + e.message;
+    }
+  });
+}
+
+// Leser ?inviter=<token> fra URL-en ved oppstart. Fjerner parameteren fra
+// URL-en uansett utfall (history.replaceState) — et ubrukt/ugyldig forsøk
+// skal ikke gjenta seg ved en vanlig sideoppdatering.
+async function haandterInvitasjonFraUrl(){
+  const params = new URLSearchParams(location.search);
+  const token = params.get('inviter');
+  if (!token) return;
+
+  params.delete('inviter');
+  const nyUrl = location.pathname + (params.toString() ? `?${params}` : '') + location.hash;
+  history.replaceState(null, '', nyUrl);
+
+  let sjekk;
+  try {
+    sjekk = await window.ApiClient.sjekkInvitasjon(token);
+  } catch (e) {
+    showToast('Kunne ikke sjekke invitasjonslenken.');
+    return;
+  }
+  if (!sjekk.gyldig) {
+    showToast('Denne invitasjonslenken er ugyldig eller utløpt.');
+    return;
+  }
+
+  inviterToken = token;
+  el('inviterKortnavnInput').value = '';
+  el('inviterEpostInput').value = '';
+  el('inviterNote').textContent = '';
+  toggleSheet('inviterPanel', true);
+}
+
+// ---------- admin: invitasjoner ----------
+
+async function renderAdminInvitasjoner(){
+  el('invitasjonNyLenke').hidden = true;
+  const container = el('invitasjonListe');
+  container.innerHTML = '<p class="hint">Laster …</p>';
+  let invitasjoner;
+  try {
+    invitasjoner = await window.ApiClient.hentAdminInvitasjoner();
+  } catch (e) {
+    container.innerHTML = `<p class="hint">Kunne ikke hente invitasjoner: ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  container.innerHTML = invitasjoner.map((i) => {
+    const utlopt = !i.brukt && i.utloper < Date.now();
+    let statusTekst;
+    if (i.brukt) statusTekst = `brukt av ${i.brukt_av_kortnavn || 'ukjent'}`;
+    else if (utlopt) statusTekst = 'utløpt';
+    else statusTekst = 'ubrukt';
+
+    return `
+      <div class="findRow" style="display:flex;flex-direction:column;align-items:stretch;gap:6px">
+        <div><span class="hint">Generert av ${escapeHtml(i.opprettet_av_kortnavn)} — ${escapeHtml(statusTekst)}</span></div>
+        <div class="sheetActions">
+          <button class="secondaryBtn" data-handling="slett" data-id="${i.id}" ${i.brukt ? 'disabled' : ''}>Trekk tilbake</button>
+        </div>
+      </div>`;
+  }).join('') || '<p class="hint">Ingen invitasjoner ennå.</p>';
+
+  container.querySelectorAll('[data-handling="slett"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await window.ApiClient.slettInvitasjon(btn.dataset.id);
+        await renderAdminInvitasjoner();
+      } catch (e) {
+        showToast('Feil: ' + e.message);
+      }
+    });
+  });
 }
 
 async function renderBrukerListe(){
@@ -1022,7 +1145,7 @@ function rodlisteBadge(kode){
 function toggleSheet(id, force){
   const sheet = el(id);
   const show = force !== undefined ? force : sheet.hidden;
-  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel','adminPanel','sidePanel'].forEach(other => {
+  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel','adminPanel','sidePanel','inviterPanel'].forEach(other => {
     if (other !== id) el(other).hidden = true;
   });
   sheet.hidden = !show;

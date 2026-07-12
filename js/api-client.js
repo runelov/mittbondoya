@@ -192,6 +192,46 @@ async function slettSide(id) {
   }
 }
 
+// Uinnlogget-vennlig — sjekker gyldighet FØR registreringsskjemaet vises,
+// se worker/api/src/routes/invitasjoner.js.
+async function sjekkInvitasjon(token) {
+  const res = await kall(`/invitasjon/${token}`);
+  if (!res.ok) throw new Error(`Kunne ikke sjekke invitasjonen (${res.status}).`);
+  return res.json();
+}
+
+async function registrerMedInvitasjon(token, felter) {
+  const res = await kall(`/invitasjon/${token}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(felter),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Kunne ikke registrere deg (${res.status}).`);
+  return data;
+}
+
+async function hentAdminInvitasjoner() {
+  const res = await kall('/admin/invitasjoner');
+  if (!res.ok) throw new Error(`Kunne ikke hente invitasjoner (${res.status}).`);
+  return res.json();
+}
+
+async function opprettInvitasjon() {
+  const res = await kall('/admin/invitasjoner', { method: 'POST' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Kunne ikke opprette invitasjon (${res.status}).`);
+  return data;
+}
+
+async function slettInvitasjon(id) {
+  const res = await kall(`/admin/invitasjoner/${id}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Kunne ikke slette invitasjonen (${res.status}).`);
+  }
+}
+
 // Bildet vises via <img src="...">, ikke fetch+blob: sesjonscookien er
 // SameSite=Lax og bondoya.no→api.bondoya.no er samme site (ulikt opphav),
 // så den sendes automatisk med et vanlig <img>-kall — samme resonnement som
@@ -229,4 +269,9 @@ window.ApiClient = {
   opprettSide,
   oppdaterSide,
   slettSide,
+  sjekkInvitasjon,
+  registrerMedInvitasjon,
+  hentAdminInvitasjoner,
+  opprettInvitasjon,
+  slettInvitasjon,
 };

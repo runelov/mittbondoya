@@ -7,10 +7,12 @@ import { listFunn, opprettFunn, oppdaterFunn, slettFunn, hentBilde } from './rou
 import {
   listBrukere, oppdaterBrukerStatus, slettBrukerPermanent, hentInnstillinger, oppdaterInnstillinger,
   listAdminSider, opprettSide, oppdaterSide, slettSide,
+  listInvitasjoner, opprettInvitasjon, slettInvitasjon,
 } from './routes/admin.js';
 import { listFunnOffentlig, hentOffentligInnstillinger } from './routes/offentlig.js';
 import { hentFlis } from './routes/tiles.js';
 import { listSider, hentSide } from './routes/sider.js';
+import { sjekkInvitasjon, registrerMedInvitasjon } from './routes/invitasjoner.js';
 
 const router = createRouter();
 router.post('/auth/be-om-lenke', beOmLenke);
@@ -36,6 +38,11 @@ router.get('/admin/sider', listAdminSider);
 router.post('/admin/sider', opprettSide);
 router.patch('/admin/sider/:id', oppdaterSide);
 router.delete('/admin/sider/:id', slettSide);
+router.get('/invitasjon/:token', sjekkInvitasjon);
+router.post('/invitasjon/:token', registrerMedInvitasjon);
+router.get('/admin/invitasjoner', listInvitasjoner);
+router.post('/admin/invitasjoner', opprettInvitasjon);
+router.delete('/admin/invitasjoner/:id', slettInvitasjon);
 
 export default {
   async fetch(request, env, ctx) {

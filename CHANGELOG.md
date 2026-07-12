@@ -1,5 +1,23 @@
 # Endringslogg
 
+## 0.6.0 — Invitasjonslenker
+Siste manuelle brukeradministrasjons-steget fra fase 3 er borte: admin kan
+nå generere en invitasjonslenke fra adminpanelet i stedet for å legge til
+nye brukere via `wrangler d1 execute`. Ny D1-tabell `invitasjoner`
+(migrasjon 0007, samme mønster som `innloggingstokens`/`sesjoner` — kun
+hash lagres, atomisk engangsbruk via `UPDATE ... RETURNING`, 7 dagers
+utløp). Nye endepunkter: `GET/POST /invitasjon/:token` (offentlig, ingen
+Turnstile — tokenets 256-bit entropi er selve anti-bot-sperren, kun et
+moderat per-IP rate-limit som friksjonslag) og
+`GET/POST/DELETE /admin/invitasjoner(/:id)`.
+
+Personen som registrerer seg (kortnavn + e-post) via lenken logges rett inn
+med en gang — ingen ekstra e-postrunde, siden selve lenken allerede beviser
+at de er invitert. Invitasjoner oppretter alltid vanlig `bruker`-rolle,
+aldri admin (det forblir en sjelden, manuell D1-operasjon). Lenken
+(`bondoya.no/?inviter=<token>`) leses fra URL-en ved oppstart og fjernes
+igjen med `history.replaceState` uansett utfall.
+
 ## 0.5.0 — Generisk sidesystem + personvernside
 Fase 3 sitt "generiske sidesystem" (konsept.md linje 194-197): admin kan nå
 selv opprette/redigere/slette et vilkårlig antall redaksjonelle sider fra

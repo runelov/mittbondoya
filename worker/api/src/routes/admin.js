@@ -3,6 +3,7 @@ import { corsHeaders } from '../lib/cors.js';
 import { requireAdmin } from '../lib/session.js';
 import { erFunnSynligForPublic, settFunnSynligForPublic } from '../lib/innstillinger.js';
 import { parseSideRad, validerSideFelter } from '../lib/sider.js';
+import { randomToken, sha256Hex } from '../lib/crypto.js';
 
 export async function listBrukere({ request, env }) {
   const cors = corsHeaders(env);
@@ -187,5 +188,57 @@ export async function slettSide({ request, env, params }) {
   if (!rad) return json({ error: 'Fant ikke siden.' }, 404, cors);
 
   await env.DB.prepare('DELETE FROM sider WHERE id = ?').bind(params.id).run();
+  return new Response(null, { status: 204, headers: cors });
+}
+
+const INVITASJON_LEVETID_MS = 7 * 24 * 60 * 60 * 1000; // 7 dager
+
+export async function listInvitasjoner({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const { results } = await env.DB.prepare(
+    `SELECT i.id, i.brukt, i.utloper, i.opprettet,
+            opp.kortnavn AS opprettet_av_kortnavn,
+            bru.kortnavn AS brukt_av_kortnavn
+     FROM invitasjoner i
+     JOIN brukere opp ON opp.id = i.opprettet_av_bruker_id
+     LEFT JOIN brukere bru ON bru.id = i.brukt_av_bruker_id
+     ORDER BY i.opprettet DESC`
+  ).all();
+  return json(results, 200, cors);
+}
+
+export async function opprettInvitasjon({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const rawToken = randomToken();
+  const hash = await sha256Hex(rawToken);
+  const utloper = Date.now() + INVITASJON_LEVETID_MS;
+
+  const rad = await env.DB.prepare(
+    `INSERT INTO invitasjoner (token_hash, opprettet_av_bruker_id, utloper) VALUES (?, ?, ?) RETURNING id`
+  )
+    .bind(hash, admin.id, utloper)
+    .first();
+
+  // Rå token returneres kun i DETTE svaret — bare hashen lagres, samme
+  // "vises kun nå"-prinsipp som magic-link-tokens (lib/session.js).
+  return json({ id: rad.id, token: rawToken, utloper }, 201, cors);
+}
+
+export async function slettInvitasjon({ request, env, params }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const rad = await env.DB.prepare('SELECT brukt FROM invitasjoner WHERE id = ?').bind(params.id).first();
+  if (!rad) return json({ error: 'Fant ikke invitasjonen.' }, 404, cors);
+  if (rad.brukt) return json({ error: 'Kan ikke trekke tilbake en invitasjon som allerede er brukt.' }, 400, cors);
+
+  await env.DB.prepare('DELETE FROM invitasjoner WHERE id = ?').bind(params.id).run();
   return new Response(null, { status: 204, headers: cors });
 }
