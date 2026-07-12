@@ -1,5 +1,5 @@
 import { randomToken } from './crypto.js';
-import { erSynligForPublic } from './artsvisibility.js';
+import { erSynligForPublic, betruaTaxonId } from './artsvisibility.js';
 
 export const ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
 
@@ -71,8 +71,8 @@ export async function validerFunnFelter(felter, env) {
   const artstype = felter.artstype;
   if (!ARTSTYPER.includes(artstype)) throw new Error('Ugyldig artstype.');
 
-  const artTaxonId = felter.art_taxon_id ? parseInt(felter.art_taxon_id, 10) : null;
-  if (felter.art_taxon_id && !Number.isFinite(artTaxonId)) throw new Error('Ugyldig taxonId.');
+  const artTaxonIdRaw = felter.art_taxon_id ? parseInt(felter.art_taxon_id, 10) : null;
+  if (felter.art_taxon_id && !Number.isFinite(artTaxonIdRaw)) throw new Error('Ugyldig taxonId.');
 
   const lat = parseFloat(felter.lat);
   const lon = parseFloat(felter.lon);
@@ -99,8 +99,13 @@ export async function validerFunnFelter(felter, env) {
     }
   }
 
-  // Servergenerert, aldri klientoppgitt — samme prinsipp som
-  // registrert_av_bruker_id. Se lib/artsvisibility.js.
+  // Kun stol på taxonId dersom det faktisk samsvarer med et kjent artsnavn
+  // i den kuraterte katalogen (se lib/artsvisibility.js) — hindrer at et
+  // vilkårlig/ikke-skjult taxonId sendes sammen med et annet (ev.
+  // rødlistet) artsnavn for å lekke posisjonen offentlig. Servergenerert
+  // fra dette punktet av, aldri klientoppgitt direkte — samme prinsipp
+  // som registrert_av_bruker_id.
+  const artTaxonId = betruaTaxonId(artTaxonIdRaw, artNorsk);
   const synligForPublic = await erSynligForPublic(artTaxonId, env);
 
   return { artNorsk, artLatinsk, artstype, artTaxonId, lat, lon, tidspunkt, kiKonfidens, kiAlternativer, synligForPublic };
