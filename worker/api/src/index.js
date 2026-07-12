@@ -8,6 +8,7 @@ import {
   listBrukere, oppdaterBrukerStatus, slettBrukerPermanent, hentInnstillinger, oppdaterInnstillinger,
   listAdminSider, opprettSide, oppdaterSide, slettSide,
   listInvitasjoner, opprettInvitasjon, slettInvitasjon,
+  listSkjulteArter, skjulArt, visArtIgjen,
 } from './routes/admin.js';
 import { listFunnOffentlig, hentOffentligInnstillinger } from './routes/offentlig.js';
 import { hentFlis } from './routes/tiles.js';
@@ -43,6 +44,9 @@ router.post('/invitasjon/:token', registrerMedInvitasjon);
 router.get('/admin/invitasjoner', listInvitasjoner);
 router.post('/admin/invitasjoner', opprettInvitasjon);
 router.delete('/admin/invitasjoner/:id', slettInvitasjon);
+router.get('/admin/skjulte-arter', listSkjulteArter);
+router.post('/admin/skjulte-arter', skjulArt);
+router.delete('/admin/skjulte-arter/:taxonId', visArtIgjen);
 
 export default {
   async fetch(request, env, ctx) {

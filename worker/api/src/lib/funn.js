@@ -60,7 +60,7 @@ export async function hentFunnRad(id, env) {
 // Validerer feltene som er felles for opprettelse og redigering (alt utenom
 // bildet). Kaster en Error med brukervennlig norsk melding ved ugyldig input
 // — rutene fanger denne og returnerer 400.
-export function validerFunnFelter(felter) {
+export async function validerFunnFelter(felter, env) {
   const artNorsk = (felter.art_norsk || '').trim();
   if (!artNorsk) throw new Error('Art (norsk navn) mangler.');
   if (artNorsk.length > MAKS_TEKST_LENGDE) throw new Error('Artsnavn er for langt.');
@@ -101,7 +101,7 @@ export function validerFunnFelter(felter) {
 
   // Servergenerert, aldri klientoppgitt — samme prinsipp som
   // registrert_av_bruker_id. Se lib/artsvisibility.js.
-  const synligForPublic = erSynligForPublic(artTaxonId);
+  const synligForPublic = await erSynligForPublic(artTaxonId, env);
 
   return { artNorsk, artLatinsk, artstype, artTaxonId, lat, lon, tidspunkt, kiKonfidens, kiAlternativer, synligForPublic };
 }

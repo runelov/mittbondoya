@@ -1,5 +1,22 @@
 # Endringslogg
 
+## 0.7.0 — Artssynlighet admin-override
+Admin kan nå skjule/vise arter fra det offentlige laget selv, uten kodeendring
+eller deploy — flytter "Arter & synlighet" (konsept.md) fra en hardkodet
+`Set` i `worker/api/src/lib/artsvisibility.js` til en ny D1-tabell
+`skjulte_arter` (migrasjon 0008, seedet med de samme 7 rødlistede artene som
+før — uendret oppførsel ved lansering). Nye endepunkter
+`GET/POST/DELETE /admin/skjulte-arter(/:taxonId)`.
+
+**Retroaktiv, ikke bare fremtidig**: å skjule eller vise en art igjen
+oppdaterer nå umiddelbart `synlig_for_public` på ALLE eksisterende funn av
+den arten, ikke bare funn registrert etter endringen — uten dette ville
+"skjul multer pga. sensitiv lokalitet" ikke faktisk beskyttet allerede
+registrerte multer-funn, stikk i strid med hensikten. `erSynligForPublic()`
+er nå et D1-oppslag (`async`) i stedet for en synkron `Set.has()`-sjekk;
+fail-closed-prinsippet for manglende taxonId (Milestone D-sikkerhetsfikset)
+er uendret.
+
 ## 0.6.0 — Invitasjonslenker
 Siste manuelle brukeradministrasjons-steget fra fase 3 er borte: admin kan
 nå generere en invitasjonslenke fra adminpanelet i stedet for å legge til

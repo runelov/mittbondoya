@@ -1,19 +1,8 @@
-// Bevisst duplisering av synligForPublic-feltet i data/species.json (som
-// kun frontend leser) — Workeren kan ikke stole på et frontend-oppgitt
-// synlighetsflagg, og å importere en fil utenfor worker/api/ er en
-// bygge-sti-avhengighet vi heller unngår. Denne listen erstattes av en
-// D1-tabell den dagen admin-panelet "Arter & synlighet" (utsatt, se
-// konsept.md) lar produkteier overstyre enkeltarter selv — hold den i sync
-// med data/species.json manuelt frem til da.
-const SKJULT_FOR_PUBLIC_TAXON_IDER = new Set([
-  3491,   // Ærfugl (VU)
-  3863,   // Storskarv (NT)
-  3562,   // Teist (NT)
-  203546, // Krykkje (EN)
-  3624,   // Gråmåke (VU)
-  3628,   // Fiskemåke (VU)
-  203529, // Tjeld (NT)
-]);
+// D1-tabellen skjulte_arter (migrations/0008) erstatter den tidligere
+// hardkodede SKJULT_FOR_PUBLIC_TAXON_IDER-settet — se konsept.md
+// "Arter & synlighet". Admin styrer nå listen selv via
+// GET/POST/DELETE /admin/skjulte-arter (routes/admin.js), ingen deploy
+// nødvendig for å skjule/vise en art.
 
 // Fail-closed, IKKE fail-open (sikkerhetsreview-funn, Milestone D): et
 // manglende taxonId betyr at vi IKKE kan bekrefte at arten er trygg å vise
@@ -24,8 +13,9 @@ const SKJULT_FOR_PUBLIC_TAXON_IDER = new Set([
 // "Ordentlig artssøk"-milestonen, se konsept.md) — akseptabelt
 // under-eksponering er langt å foretrekke fremfor å lekke et rødlistet
 // funns posisjon ved en tilfeldighet. Kun eksplisitt kjente,
-// taxonId-bekreftede arter som ikke står i blokkeringslisten vises.
-export function erSynligForPublic(taxonId) {
+// taxonId-bekreftede arter som ikke står i skjulte_arter vises.
+export async function erSynligForPublic(taxonId, env) {
   if (!taxonId) return false;
-  return !SKJULT_FOR_PUBLIC_TAXON_IDER.has(taxonId);
+  const rad = await env.DB.prepare('SELECT 1 FROM skjulte_arter WHERE taxon_id = ?').bind(taxonId).first();
+  return !rad;
 }

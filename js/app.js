@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.6.0';
+const APP_VERSION = '0.7.0';
 const APP_BUILD_DATE = '2026-07-12';
 
 const el = id => document.getElementById(id);
@@ -226,6 +226,9 @@ function wireAdminPanel(){
     toggleSheet('adminPanel');
     if (!el('adminPanel').hidden) {
       await renderInnstillinger();
+      renderArtVelgSelect();
+      tomArtSkjema();
+      await renderAdminSkjulteArter();
       tomSideSkjema();
       await renderAdminSider();
       await renderAdminInvitasjoner();
@@ -295,6 +298,36 @@ function wireAdminPanel(){
       showToast('Kunne ikke kopiere — merk og kopier lenken manuelt.');
     }
   });
+
+  el('artVelgSelect').addEventListener('change', () => {
+    const taxonId = el('artVelgSelect').value;
+    if (!taxonId) return;
+    const art = speciesCache.find((a) => String(a.taxonId) === taxonId);
+    if (!art) return;
+    el('artTaxonIdInput').value = art.taxonId;
+    el('artVisningsnavnInput').value = art.norsk;
+  });
+
+  el('artSkjulBtn').addEventListener('click', async () => {
+    const felter = {
+      taxonId: el('artTaxonIdInput').value,
+      visningsnavn: el('artVisningsnavnInput').value.trim(),
+      grunn: el('artGrunnInput').value.trim(),
+    };
+    if (!felter.taxonId || !felter.visningsnavn) {
+      el('artAdminNote').textContent = 'Fyll ut både taxonId og visningsnavn.';
+      return;
+    }
+    el('artAdminNote').textContent = 'Lagrer …';
+    try {
+      await window.ApiClient.skjulArt(felter);
+      tomArtSkjema();
+      await renderAdminSkjulteArter();
+      showToast('Arten er skjult — allerede registrerte funn er oppdatert.');
+    } catch (e) {
+      el('artAdminNote').textContent = 'Feil: ' + e.message;
+    }
+  });
 }
 
 async function renderInnstillinger(){
@@ -316,6 +349,55 @@ function oppdaterFunnSynlighetKnapp(){
   btn.textContent = adminInnstillingerCache.funnSynligForPublic
     ? 'Skru av offentlig funnvisning'
     : 'Skru på offentlig funnvisning';
+}
+
+// ---------- admin: arter (synlighet i det offentlige laget) ----------
+
+function renderArtVelgSelect(){
+  const select = el('artVelgSelect');
+  select.innerHTML = '<option value="">— velg for å forhåndsutfylle —</option>' +
+    speciesCache.map((a) => `<option value="${a.taxonId}">${escapeHtml(a.norsk)}</option>`).join('');
+}
+
+function tomArtSkjema(){
+  el('artVelgSelect').value = '';
+  el('artTaxonIdInput').value = '';
+  el('artVisningsnavnInput').value = '';
+  el('artGrunnInput').value = '';
+  el('artAdminNote').textContent = '';
+}
+
+async function renderAdminSkjulteArter(){
+  const container = el('artListeAdmin');
+  container.innerHTML = '<p class="hint">Laster …</p>';
+  let arter;
+  try {
+    arter = await window.ApiClient.hentAdminSkjulteArter();
+  } catch (e) {
+    container.innerHTML = `<p class="hint">Kunne ikke hente skjulte arter: ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  container.innerHTML = arter.map((a) => `
+    <div class="findRow" style="display:flex;flex-direction:column;align-items:stretch;gap:6px">
+      <div><strong>${escapeHtml(a.visningsnavn)}</strong> <span class="hint">taxonId ${a.taxon_id}</span></div>
+      ${a.grunn ? `<div class="hint">${escapeHtml(a.grunn)}</div>` : ''}
+      <div class="sheetActions">
+        <button class="secondaryBtn" data-handling="vis" data-taxon-id="${a.taxon_id}">Vis igjen</button>
+      </div>
+    </div>`).join('') || '<p class="hint">Ingen arter skjult.</p>';
+
+  container.querySelectorAll('[data-handling="vis"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await window.ApiClient.visArtIgjen(btn.dataset.taxonId);
+        await renderAdminSkjulteArter();
+        showToast('Arten er synlig igjen — allerede registrerte funn er oppdatert.');
+      } catch (e) {
+        showToast('Feil: ' + e.message);
+      }
+    });
+  });
 }
 
 // ---------- admin: sider ----------

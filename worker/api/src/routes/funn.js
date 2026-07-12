@@ -28,7 +28,7 @@ export async function opprettFunn({ request, env }) {
   let felter;
   let bildeKey;
   try {
-    felter = validerFunnFelter(Object.fromEntries(formData.entries()));
+    felter = await validerFunnFelter(Object.fromEntries(formData.entries()), env);
     bildeKey = await lastOppBildeHvisTilstede(formData, bruker.id, env);
   } catch (e) {
     return json({ error: e.message }, 400, cors);
@@ -82,7 +82,7 @@ export async function oppdaterFunn({ request, env, params }) {
 
   let felter;
   try {
-    felter = validerFunnFelter(body);
+    felter = await validerFunnFelter(body, env);
   } catch (e) {
     return json({ error: e.message }, 400, cors);
   }

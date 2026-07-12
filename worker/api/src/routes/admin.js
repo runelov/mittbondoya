@@ -242,3 +242,71 @@ export async function slettInvitasjon({ request, env, params }) {
   await env.DB.prepare('DELETE FROM invitasjoner WHERE id = ?').bind(params.id).run();
   return new Response(null, { status: 204, headers: cors });
 }
+
+export async function listSkjulteArter({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const { results } = await env.DB.prepare('SELECT * FROM skjulte_arter ORDER BY visningsnavn').all();
+  return json(results, 200, cors);
+}
+
+export async function skjulArt({ request, env }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Ugyldig forespørsel.' }, 400, cors);
+  }
+
+  const taxonId = parseInt(body.taxonId, 10);
+  if (!Number.isFinite(taxonId) || taxonId <= 0) return json({ error: 'Ugyldig taxonId.' }, 400, cors);
+
+  const visningsnavn = (body.visningsnavn || '').trim();
+  if (!visningsnavn) return json({ error: 'Visningsnavn mangler.' }, 400, cors);
+  if (visningsnavn.length > 200) return json({ error: 'Visningsnavn er for langt.' }, 400, cors);
+
+  const grunn = (body.grunn || '').trim() || null;
+  if (grunn && grunn.length > 500) return json({ error: 'Grunn er for lang.' }, 400, cors);
+
+  let rad;
+  try {
+    rad = await env.DB.prepare(
+      `INSERT INTO skjulte_arter (taxon_id, visningsnavn, grunn, lagt_til_av_bruker_id)
+       VALUES (?, ?, ?, ?) RETURNING *`
+    )
+      .bind(taxonId, visningsnavn, grunn, admin.id)
+      .first();
+  } catch (e) {
+    return json({ error: 'Denne arten er allerede skjult.' }, 400, cors);
+  }
+
+  // Retroaktiv skjuling — se plan-notatet: hele poenget med å skjule en art
+  // manuelt (f.eks. en sensitiv lokalitet) forsvinner hvis allerede
+  // registrerte funn av den arten forblir synlige.
+  await env.DB.prepare('UPDATE funn SET synlig_for_public = 0 WHERE art_taxon_id = ?').bind(taxonId).run();
+
+  return json(rad, 201, cors);
+}
+
+export async function visArtIgjen({ request, env, params }) {
+  const cors = corsHeaders(env);
+  const admin = await requireAdmin(request, env);
+  if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  const taxonId = parseInt(params.taxonId, 10);
+  const rad = await env.DB.prepare('SELECT taxon_id FROM skjulte_arter WHERE taxon_id = ?').bind(taxonId).first();
+  if (!rad) return json({ error: 'Fant ikke arten i skjult-listen.' }, 404, cors);
+
+  await env.DB.prepare('DELETE FROM skjulte_arter WHERE taxon_id = ?').bind(taxonId).run();
+  // Retroaktivt motsatt av skjulArt() over — en kjent taxonId uten noen
+  // blokkeringsrad er per definisjon synlig, se lib/artsvisibility.js.
+  await env.DB.prepare('UPDATE funn SET synlig_for_public = 1 WHERE art_taxon_id = ?').bind(taxonId).run();
+
+  return new Response(null, { status: 204, headers: cors });
+}

@@ -81,6 +81,25 @@
     <p class="hint">Når av: funn vises ikke i kartet eller funnlisten for besøkende uten innlogging, og det offentlige API-et returnerer ingen funn-data. Når på: funn filtreres alltid (rødliste og selvvalgte) som i dag.</p>
     <button id="funnSynligForPublicBtn" class="secondaryBtn"></button>
   </div>
+  <h2>Admin — arter</h2>
+  <p class="hint">Skjul en art fra det offentlige laget selv om den ikke er rødlistet (f.eks. sensitiv lokalitet). Dette oppdaterer også allerede registrerte funn av arten, ikke bare fremtidige.</p>
+  <div id="artListeAdmin" class="findList"></div>
+  <div style="display:flex;flex-direction:column;gap:4px">
+    <label for="artVelgSelect">Velg art fra lokal liste (valgfritt, forhåndsutfyller under)</label>
+    <select id="artVelgSelect">
+      <option value="">— velg for å forhåndsutfylle —</option>
+    </select>
+    <label for="artTaxonIdInput">TaxonId</label>
+    <input id="artTaxonIdInput" type="number" min="1" step="1">
+    <label for="artVisningsnavnInput">Visningsnavn</label>
+    <input id="artVisningsnavnInput" type="text">
+    <label for="artGrunnInput">Grunn (valgfritt, kun synlig for admin)</label>
+    <input id="artGrunnInput" type="text">
+    <div class="sheetActions">
+      <button id="artSkjulBtn" class="primaryBtn">Skjul art</button>
+    </div>
+    <p id="artAdminNote" class="note"></p>
+  </div>
   <h2>Admin — sider</h2>
   <div id="sideListeAdmin" class="findList"></div>
   <div id="sideSkjema" style="display:flex;flex-direction:column;gap:4px">

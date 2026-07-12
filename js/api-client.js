@@ -232,6 +232,31 @@ async function slettInvitasjon(id) {
   }
 }
 
+async function hentAdminSkjulteArter() {
+  const res = await kall('/admin/skjulte-arter');
+  if (!res.ok) throw new Error(`Kunne ikke hente skjulte arter (${res.status}).`);
+  return res.json();
+}
+
+async function skjulArt(felter) {
+  const res = await kall('/admin/skjulte-arter', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(felter),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Kunne ikke skjule arten (${res.status}).`);
+  return data;
+}
+
+async function visArtIgjen(taxonId) {
+  const res = await kall(`/admin/skjulte-arter/${taxonId}`, { method: 'DELETE' });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || `Kunne ikke vise arten igjen (${res.status}).`);
+  }
+}
+
 // Bildet vises via <img src="...">, ikke fetch+blob: sesjonscookien er
 // SameSite=Lax og bondoya.no→api.bondoya.no er samme site (ulikt opphav),
 // så den sendes automatisk med et vanlig <img>-kall — samme resonnement som
@@ -274,4 +299,7 @@ window.ApiClient = {
   hentAdminInvitasjoner,
   opprettInvitasjon,
   slettInvitasjon,
+  hentAdminSkjulteArter,
+  skjulArt,
+  visArtIgjen,
 };
