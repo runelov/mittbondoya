@@ -9,7 +9,7 @@ export async function listFunn({ request, env }) {
   if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
 
   const { results } = await env.DB.prepare('SELECT * FROM funn ORDER BY tidspunkt DESC').all();
-  return json(results.map((rad) => parseFunnRad(rad, bruker.id)), 200, cors);
+  return json(results.map((rad) => parseFunnRad(rad, bruker)), 200, cors);
 }
 
 export async function opprettFunn({ request, env }) {
@@ -57,7 +57,7 @@ export async function opprettFunn({ request, env }) {
     )
     .first();
 
-  return json(parseFunnRad(rad, bruker.id), 201, cors);
+  return json(parseFunnRad(rad, bruker), 201, cors);
 }
 
 export async function oppdaterFunn({ request, env, params }) {
@@ -104,7 +104,7 @@ export async function oppdaterFunn({ request, env, params }) {
     )
     .first();
 
-  return json(parseFunnRad(rad, bruker.id), 200, cors);
+  return json(parseFunnRad(rad, bruker), 200, cors);
 }
 
 export async function slettFunn({ request, env, params }) {
@@ -114,7 +114,10 @@ export async function slettFunn({ request, env, params }) {
 
   const eksisterende = await hentFunnRad(params.id, env);
   if (!eksisterende) return json({ error: 'Fant ikke funnet.' }, 404, cors);
-  if (eksisterende.registrert_av_bruker_id !== bruker.id) {
+  // Admin kan slette hvilket som helst funn (moderasjon av upassende
+  // innhold) — se konsept.md "Admin-moderasjon". Rediger (oppdaterFunn over)
+  // har bevisst ingen tilsvarende admin-unntak, kun sletting.
+  if (eksisterende.registrert_av_bruker_id !== bruker.id && bruker.rolle !== 'admin') {
     return json({ error: 'Du kan kun slette dine egne funn.' }, 403, cors);
   }
 

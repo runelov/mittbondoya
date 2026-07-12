@@ -8,7 +8,9 @@ const MAKS_TEKST_LENGDE = 200;
 
 // Formen appen faktisk konsumerer — skjuler D1-kolonnenavn og R2-nøkkelen
 // (bildeUrl peker til det egne serveringsendepunktet, ikke R2 direkte).
-export function parseFunnRad(rad, innloggetBrukerId) {
+// Tar hele bruker-objektet (ikke bare id) — kanSlette trenger rollen også.
+export function parseFunnRad(rad, innloggetBruker) {
+  const erEgenRegistrering = rad.registrert_av_bruker_id === innloggetBruker.id;
   return {
     id: rad.id,
     art: {
@@ -24,7 +26,8 @@ export function parseFunnRad(rad, innloggetBrukerId) {
     kiKonfidens: rad.ki_konfidens,
     kiAlternativer: rad.ki_alternativer ? JSON.parse(rad.ki_alternativer) : [],
     registrertAv: rad.registrert_av_kortnavn,
-    erEgenRegistrering: rad.registrert_av_bruker_id === innloggetBrukerId,
+    erEgenRegistrering,
+    kanSlette: erEgenRegistrering || innloggetBruker.rolle === 'admin',
     opprettet: rad.opprettet,
   };
 }

@@ -47,6 +47,14 @@ export async function requireSession(request, env) {
   return rad;
 }
 
+// Bygger på requireSession() — samme "én delt funksjon"-prinsipp, alle
+// admin-ruter kaller DENNE, aldri en egen kopiert rolle-sjekk.
+export async function requireAdmin(request, env) {
+  const bruker = await requireSession(request, env);
+  if (!bruker || bruker.rolle !== 'admin') return null;
+  return bruker;
+}
+
 export async function slettSesjon(request, env) {
   const token = parseCookie(request.headers.get('Cookie') || '', COOKIE_NAVN);
   if (!token) return;

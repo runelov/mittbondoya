@@ -26,6 +26,7 @@
   <button id="setupToggle" class="iconBtn" aria-label="Innstillinger" title="Innstillinger">⚙️</button>
   <div id="syncStatus" class="pill" hidden></div>
   <button id="listToggle" class="iconBtn" aria-label="Funnliste" title="Funnliste">📋</button>
+  <button id="adminToggle" class="iconBtn" aria-label="Admin" title="Admin" hidden>🛡️</button>
 </header>
 
 <!-- Konto / innlogging (magic-link mot bondoya-api) -->
@@ -46,6 +47,13 @@
     <p>Logget inn som <strong id="accountKortnavn"></strong></p>
     <button id="loggUtBtn" class="secondaryBtn">Logg ut</button>
   </div>
+</div>
+
+<!-- Admin: brukerliste + moderasjon (kun synlig/tilgjengelig for rolle==='admin', håndhevet server-side) -->
+<div id="adminPanel" class="sheet" hidden>
+  <div class="sheetHandle"></div>
+  <h2>Admin — brukere</h2>
+  <div id="brukerList" class="findList"></div>
 </div>
 
 <!-- Setup: KI-proxy/Mapbox, samt valgfri tilkobling til det private artskart-berikelsesrepoet -->

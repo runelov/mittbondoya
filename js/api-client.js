@@ -83,6 +83,30 @@ async function slettFunn(id) {
   }
 }
 
+async function hentBrukere() {
+  const res = await kall('/admin/brukere');
+  if (!res.ok) throw new Error(`Kunne ikke hente brukerliste (${res.status}).`);
+  return res.json();
+}
+
+async function settBrukerStatus(id, status) {
+  const res = await kall(`/admin/brukere/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Kunne ikke oppdatere bruker (${res.status}).`);
+  return data;
+}
+
+async function slettBrukerPermanent(id) {
+  const res = await kall(`/admin/brukere/${id}`, { method: 'DELETE' });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `Kunne ikke slette bruker (${res.status}).`);
+  return data;
+}
+
 // Bildet vises via <img src="...">, ikke fetch+blob: sesjonscookien er
 // SameSite=Lax og bondoya.no→api.bondoya.no er samme site (ulikt opphav),
 // så den sendes automatisk med et vanlig <img>-kall — samme resonnement som
@@ -100,4 +124,7 @@ window.ApiClient = {
   oppdaterFunn,
   slettFunn,
   bildeUrl,
+  hentBrukere,
+  settBrukerStatus,
+  slettBrukerPermanent,
 };

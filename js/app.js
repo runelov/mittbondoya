@@ -34,6 +34,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   await refreshFromRepo();
 
   wireAccountPanel();
+  wireAdminPanel();
   wireSetupPanel();
   wireListPanel();
   wireRegisterFlow();
@@ -168,6 +169,72 @@ function renderAccountPanel(){
   el('accountLoggedOut').hidden = !!brukerCache;
   el('accountLoggedInn').hidden = !brukerCache;
   if (brukerCache) el('accountKortnavn').textContent = brukerCache.kortnavn;
+  // Kun kosmetisk — skjuler knappen for ikke-admins. Faktisk håndhevelse
+  // skjer server-side (requireAdmin() på hvert admin-endepunkt), en
+  // klientside-sjekk her er ingen sikkerhetsgrense i seg selv.
+  el('adminToggle').hidden = !brukerCache || brukerCache.rolle !== 'admin';
+}
+
+// ---------- admin ----------
+
+function wireAdminPanel(){
+  el('adminToggle').addEventListener('click', async () => {
+    toggleSheet('adminPanel');
+    if (!el('adminPanel').hidden) await renderBrukerListe();
+  });
+}
+
+async function renderBrukerListe(){
+  const container = el('brukerList');
+  container.innerHTML = '<p class="hint">Laster …</p>';
+  let brukere;
+  try {
+    brukere = await window.ApiClient.hentBrukere();
+  } catch (e) {
+    container.innerHTML = `<p class="hint">Kunne ikke hente brukerliste: ${escapeHtml(e.message)}</p>`;
+    return;
+  }
+
+  container.innerHTML = brukere.map((b) => {
+    const slettetPermanent = !!b.slettet_tidspunkt;
+    // /meg returnerer ikke bruker-id, kun epost/kortnavn/rolle — sammenlign på
+    // epost i stedet (unikt, og uendret for innlogget admin siden
+    // selv-sletting/-deaktivering avvises server-side uansett).
+    const erSelv = brukerCache && b.epost === brukerCache.epost;
+    return `
+      <div class="findRow" style="display:flex;flex-direction:column;align-items:stretch;gap:6px">
+        <div><strong>${escapeHtml(b.kortnavn)}</strong> <span class="hint">${escapeHtml(b.rolle)}</span></div>
+        <div class="hint">${escapeHtml(b.epost)} — ${slettetPermanent ? 'permanent slettet' : b.status}</div>
+        <div class="sheetActions">
+          <button class="secondaryBtn" data-handling="status" data-id="${b.id}" data-neste="${b.status === 'aktiv' ? 'deaktivert' : 'aktiv'}"
+            ${slettetPermanent || erSelv ? 'disabled' : ''}>${b.status === 'aktiv' ? 'Deaktiver' : 'Reaktiver'}</button>
+          <button class="secondaryBtn" data-handling="slett" data-id="${b.id}"
+            ${slettetPermanent || erSelv ? 'disabled' : ''}>Slett permanent</button>
+        </div>
+      </div>`;
+  }).join('') || '<p class="hint">Ingen brukere.</p>';
+
+  container.querySelectorAll('[data-handling="status"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      try {
+        await window.ApiClient.settBrukerStatus(btn.dataset.id, btn.dataset.neste);
+        await renderBrukerListe();
+      } catch (e) {
+        showToast('Feil: ' + e.message);
+      }
+    });
+  });
+  container.querySelectorAll('[data-handling="slett"]').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Slette denne brukeren permanent? E-posten fjernes for godt — kan ikke angres.')) return;
+      try {
+        await window.ApiClient.slettBrukerPermanent(btn.dataset.id);
+        await renderBrukerListe();
+      } catch (e) {
+        showToast('Feil: ' + e.message);
+      }
+    });
+  });
 }
 
 // ---------- setup-panel ----------
@@ -642,17 +709,17 @@ async function openDetail(funn){
     ${count ? `<p class="hint">Registrert ${count} ganger i nærheten før (Artskart).</p>` : ''}
     <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}${funn.registrertAv ? ' av ' + escapeHtml(funn.registrertAv) : ''}</p>
     ${s.artskartUrl ? `<a href="${s.artskartUrl}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}
-    ${funn.erEgenRegistrering ? `
+    ${funn.erEgenRegistrering || funn.kanSlette ? `
       <div class="sheetActions">
-        <button id="redigerFunnBtn" class="secondaryBtn">Rediger</button>
-        <button id="slettFunnBtn" class="secondaryBtn">Slett</button>
+        ${funn.erEgenRegistrering ? '<button id="redigerFunnBtn" class="secondaryBtn">Rediger</button>' : ''}
+        ${funn.kanSlette ? '<button id="slettFunnBtn" class="secondaryBtn">Slett</button>' : ''}
       </div>
       <div id="redigerFunnForm" hidden></div>` : ''}`;
   toggleSheet('detailPanel', true);
 
-  if (!funn.erEgenRegistrering) return;
+  if (funn.erEgenRegistrering) el('redigerFunnBtn').addEventListener('click', () => renderRedigerFunnSkjema(funn));
+  if (!funn.kanSlette) return;
 
-  el('redigerFunnBtn').addEventListener('click', () => renderRedigerFunnSkjema(funn));
   el('slettFunnBtn').addEventListener('click', async () => {
     if (!confirm(`Slette funnet «${funn.art?.norsk || 'Ukjent'}»? Dette kan ikke angres.`)) return;
     try {
@@ -751,7 +818,7 @@ function rodlisteBadge(kode){
 function toggleSheet(id, force){
   const sheet = el(id);
   const show = force !== undefined ? force : sheet.hidden;
-  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel'].forEach(other => {
+  ['setupPanel','listPanel','detailPanel','registerPanel','accountPanel','adminPanel'].forEach(other => {
     if (other !== id) el(other).hidden = true;
   });
   sheet.hidden = !show;

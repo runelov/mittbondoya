@@ -4,6 +4,7 @@ import { json } from './lib/json.js';
 import { beOmLenke, verifiser, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
 import { listFunn, opprettFunn, oppdaterFunn, slettFunn, hentBilde } from './routes/funn.js';
+import { listBrukere, oppdaterBrukerStatus, slettBrukerPermanent } from './routes/admin.js';
 
 const router = createRouter();
 router.post('/auth/be-om-lenke', beOmLenke);
@@ -15,6 +16,9 @@ router.post('/funn', opprettFunn);
 router.patch('/funn/:id', oppdaterFunn);
 router.delete('/funn/:id', slettFunn);
 router.get('/funn/bilde/:id', hentBilde);
+router.get('/admin/brukere', listBrukere);
+router.patch('/admin/brukere/:id', oppdaterBrukerStatus);
+router.delete('/admin/brukere/:id', slettBrukerPermanent);
 
 export default {
   async fetch(request, env, ctx) {
