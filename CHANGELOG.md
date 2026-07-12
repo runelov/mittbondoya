@@ -1,5 +1,30 @@
 # Endringslogg
 
+## 0.8.1 — Sikkerhetsfiks: e-post bundet til invitasjonslenke
+`/security-review` av v0.4.2–v0.8.0 avdekket at invitasjonsregistrering
+(`POST /invitasjon/:token`) tidligere lot den som klikket lenken oppgi en
+**vilkårlig e-postadresse selv**, uten noen verifikasjon av eierskap.
+Ulikt den vanlige innloggingsflyten (som først bekrefter e-post ved å sende
+en lenke DIT) beviste invitasjonstokenet kun at man hadde fått delt en
+lenke — ikke hvilken adresse man faktisk rår over. Konkret risiko: noen med
+lenken kunne registrere seg med en annens reelle e-postadresse, kapre den
+permanent (`UNIQUE`-constraint på `brukere.epost`) og få en innlogget
+sesjon knyttet til den, uten at eieren noensinne fikk noe å bekrefte.
+
+Fikset ved å binde hver invitasjonslenke til én bestemt e-post **admin selv
+oppgir ved generering** (ny `epost`-kolonne, migrasjon 0009) — samme
+tillitsnivå som at admin allerede vet hvem de inviterer manuelt i dag.
+Registrering bruker alltid denne bundne adressen server-side; en eventuell
+e-post i registreringsforespørselen ignoreres fullstendig. Eldre
+invitasjoner (fra før fiksen, uten bundet e-post) blir permanent
+ikke-innløsbare — riktig oppførsel, ikke en feil. Ingen ekstra e-postrunde
+for den som registrerer seg — samme sømløse "logg rett inn"-flyt som før.
+
+Fikset også en pre-eksisterende UI-bug fra v0.6.0 oppdaget under
+verifisering: "ny lenke"-boksen i adminpanelet ble skjult igjen umiddelbart
+etter at den ble vist, slik at admin i praksis aldri fikk sett/kopiert
+lenken.
+
 ## 0.8.0 — Admin-dashboard
 Siste punkt i fase 3-listen: et enkelt bruksstatistikk-dashboard for admin,
 åpnet via en ny "📊 Dashboard"-knapp øverst i adminpanelet. Nytt endepunkt

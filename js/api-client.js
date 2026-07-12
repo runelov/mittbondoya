@@ -217,8 +217,12 @@ async function hentAdminInvitasjoner() {
   return res.json();
 }
 
-async function opprettInvitasjon() {
-  const res = await kall('/admin/invitasjoner', { method: 'POST' });
+async function opprettInvitasjon(epost) {
+  const res = await kall('/admin/invitasjoner', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ epost }),
+  });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || `Kunne ikke opprette invitasjon (${res.status}).`);
   return data;

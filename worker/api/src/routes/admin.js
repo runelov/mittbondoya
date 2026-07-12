@@ -4,6 +4,7 @@ import { requireAdmin } from '../lib/session.js';
 import { erFunnSynligForPublic, settFunnSynligForPublic } from '../lib/innstillinger.js';
 import { parseSideRad, validerSideFelter } from '../lib/sider.js';
 import { randomToken, sha256Hex } from '../lib/crypto.js';
+import { validerEpost } from '../lib/invitasjoner.js';
 
 export async function listBrukere({ request, env }) {
   const cors = corsHeaders(env);
@@ -199,7 +200,7 @@ export async function listInvitasjoner({ request, env }) {
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
 
   const { results } = await env.DB.prepare(
-    `SELECT i.id, i.brukt, i.utloper, i.opprettet,
+    `SELECT i.id, i.epost, i.brukt, i.utloper, i.opprettet,
             opp.kortnavn AS opprettet_av_kortnavn,
             bru.kortnavn AS brukt_av_kortnavn
      FROM invitasjoner i
@@ -210,24 +211,41 @@ export async function listInvitasjoner({ request, env }) {
   return json(results, 200, cors);
 }
 
+// Krever nå e-post ved generering (sikkerhetsfiks, se lib/invitasjoner.js):
+// lenken bindes til én bestemt adresse admin selv oppgir, ikke lenger noe
+// den som klikker lenken kan velge fritt ved registrering.
 export async function opprettInvitasjon({ request, env }) {
   const cors = corsHeaders(env);
   const admin = await requireAdmin(request, env);
   if (!admin) return json({ error: 'Krever admin-tilgang.' }, 403, cors);
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: 'Ugyldig forespørsel.' }, 400, cors);
+  }
+
+  let epost;
+  try {
+    epost = validerEpost(body.epost);
+  } catch (e) {
+    return json({ error: e.message }, 400, cors);
+  }
 
   const rawToken = randomToken();
   const hash = await sha256Hex(rawToken);
   const utloper = Date.now() + INVITASJON_LEVETID_MS;
 
   const rad = await env.DB.prepare(
-    `INSERT INTO invitasjoner (token_hash, opprettet_av_bruker_id, utloper) VALUES (?, ?, ?) RETURNING id`
+    `INSERT INTO invitasjoner (token_hash, epost, opprettet_av_bruker_id, utloper) VALUES (?, ?, ?, ?) RETURNING id`
   )
-    .bind(hash, admin.id, utloper)
+    .bind(hash, epost, admin.id, utloper)
     .first();
 
   // Rå token returneres kun i DETTE svaret — bare hashen lagres, samme
   // "vises kun nå"-prinsipp som magic-link-tokens (lib/session.js).
-  return json({ id: rad.id, token: rawToken, utloper }, 201, cors);
+  return json({ id: rad.id, token: rawToken, epost, utloper }, 201, cors);
 }
 
 export async function slettInvitasjon({ request, env, params }) {
@@ -357,8 +375,8 @@ export async function hentDashboard({ request, env }) {
     env.DB.prepare(
       `SELECT COUNT(*) AS totalt,
               COALESCE(SUM(CASE WHEN brukt = 1 THEN 1 ELSE 0 END), 0) AS brukt,
-              COALESCE(SUM(CASE WHEN brukt = 0 AND utloper > ?1 THEN 1 ELSE 0 END), 0) AS ubruktGyldig,
-              COALESCE(SUM(CASE WHEN brukt = 0 AND utloper <= ?1 THEN 1 ELSE 0 END), 0) AS utlopt
+              COALESCE(SUM(CASE WHEN brukt = 0 AND utloper > ?1 AND epost IS NOT NULL THEN 1 ELSE 0 END), 0) AS ubruktGyldig,
+              COALESCE(SUM(CASE WHEN brukt = 0 AND (utloper <= ?1 OR epost IS NULL) THEN 1 ELSE 0 END), 0) AS utlopt
        FROM invitasjoner`
     ).bind(now).first(),
     env.DB.prepare('SELECT COUNT(*) AS totalt FROM skjulte_arter').first(),

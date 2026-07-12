@@ -61,11 +61,11 @@
 <div id="inviterPanel" class="sheet" hidden>
   <div class="sheetHandle"></div>
   <h2>Bli med på Bondøya</h2>
-  <p class="hint">Du er invitert. Fyll ut kortnavn og e-post for å registrere deg — du blir logget inn med en gang.</p>
+  <p class="hint">Du er invitert. Skriv inn kortnavnet ditt for å registrere deg — du blir logget inn med en gang.</p>
   <label for="inviterKortnavnInput">Kortnavn</label>
   <input id="inviterKortnavnInput" type="text" autocomplete="name">
-  <label for="inviterEpostInput">E-post</label>
-  <input id="inviterEpostInput" type="email" autocomplete="email">
+  <label for="inviterEpostInput">E-post (fra invitasjonen)</label>
+  <input id="inviterEpostInput" type="email" readonly>
   <div class="sheetActions">
     <button id="inviterRegistrerBtn" class="primaryBtn">Registrer</button>
   </div>
@@ -142,8 +142,10 @@
     <button id="invitasjonKopierBtn" class="secondaryBtn">Kopier lenke</button>
   </div>
   <div id="invitasjonListe" class="findList"></div>
+  <label for="invitasjonEpostInput">E-post til personen du inviterer</label>
+  <input id="invitasjonEpostInput" type="email" autocomplete="off" placeholder="navn@epost.no">
   <div class="sheetActions">
-    <button id="invitasjonGenererBtn" class="primaryBtn">Generer ny invitasjonslenke</button>
+    <button id="invitasjonGenererBtn" class="primaryBtn">Generer invitasjonslenke</button>
   </div>
   <h2>Admin — brukere</h2>
   <div id="brukerList" class="findList"></div>

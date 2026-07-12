@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.8.0';
+const APP_VERSION = '0.8.1';
 const APP_BUILD_DATE = '2026-07-12';
 
 const el = id => document.getElementById(id);
@@ -232,6 +232,7 @@ function wireAdminPanel(){
       await renderAdminSkjulteArter();
       tomSideSkjema();
       await renderAdminSider();
+      el('invitasjonNyLenke').hidden = true;
       await renderAdminInvitasjoner();
       await renderBrukerListe();
     }
@@ -277,12 +278,15 @@ function wireAdminPanel(){
   });
 
   el('invitasjonGenererBtn').addEventListener('click', async () => {
+    const epost = el('invitasjonEpostInput').value.trim();
+    if (!epost) { showToast('Skriv inn e-posten til personen du inviterer.'); return; }
     el('invitasjonGenererBtn').disabled = true;
     try {
-      const { token } = await window.ApiClient.opprettInvitasjon();
+      const { token } = await window.ApiClient.opprettInvitasjon(epost);
       const lenke = `${location.origin}${location.pathname}?inviter=${token}`;
       el('invitasjonLenkeInput').value = lenke;
       el('invitasjonNyLenke').hidden = false;
+      el('invitasjonEpostInput').value = '';
       await renderAdminInvitasjoner();
     } catch (e) {
       showToast('Feil: ' + e.message);
@@ -573,12 +577,14 @@ function renderSideInnhold(innhold){
 function wireInviterPanel(){
   el('inviterRegistrerBtn').addEventListener('click', async () => {
     const kortnavn = el('inviterKortnavnInput').value.trim();
-    const epost = el('inviterEpostInput').value.trim();
-    if (!kortnavn || !epost) { el('inviterNote').textContent = 'Fyll ut både kortnavn og e-post.'; return; }
+    if (!kortnavn) { el('inviterNote').textContent = 'Skriv inn kortnavnet ditt.'; return; }
 
     el('inviterNote').textContent = 'Registrerer …';
     try {
-      await window.ApiClient.registrerMedInvitasjon(inviterToken, { kortnavn, epost });
+      // E-post sendes bevisst IKKE med herfra — den er alltid bundet
+      // server-side til invitasjonen (sikkerhetsfiks, se
+      // worker/api/src/lib/invitasjoner.js).
+      await window.ApiClient.registrerMedInvitasjon(inviterToken, { kortnavn });
       toggleSheet('inviterPanel', false);
       showToast(`Velkommen, ${kortnavn}!`);
       await sjekkSesjon();
@@ -615,7 +621,7 @@ async function haandterInvitasjonFraUrl(){
 
   inviterToken = token;
   el('inviterKortnavnInput').value = '';
-  el('inviterEpostInput').value = '';
+  el('inviterEpostInput').value = sjekk.epost;
   el('inviterNote').textContent = '';
   toggleSheet('inviterPanel', true);
 }
@@ -623,7 +629,6 @@ async function haandterInvitasjonFraUrl(){
 // ---------- admin: invitasjoner ----------
 
 async function renderAdminInvitasjoner(){
-  el('invitasjonNyLenke').hidden = true;
   const container = el('invitasjonListe');
   container.innerHTML = '<p class="hint">Laster …</p>';
   let invitasjoner;
@@ -635,7 +640,9 @@ async function renderAdminInvitasjoner(){
   }
 
   container.innerHTML = invitasjoner.map((i) => {
-    const utlopt = !i.brukt && i.utloper < Date.now();
+    // epost mangler kun for invitasjoner opprettet før sikkerhetsfiksen
+    // (migrations/0009) — permanent ikke-innløsbare, se lib/invitasjoner.js.
+    const utlopt = !i.brukt && (i.utloper < Date.now() || !i.epost);
     let statusTekst;
     if (i.brukt) statusTekst = `brukt av ${i.brukt_av_kortnavn || 'ukjent'}`;
     else if (utlopt) statusTekst = 'utløpt';
@@ -643,6 +650,7 @@ async function renderAdminInvitasjoner(){
 
     return `
       <div class="findRow" style="display:flex;flex-direction:column;align-items:stretch;gap:6px">
+        <div><strong>${escapeHtml(i.epost || 'ukjent e-post')}</strong></div>
         <div><span class="hint">Generert av ${escapeHtml(i.opprettet_av_kortnavn)} — ${escapeHtml(statusTekst)}</span></div>
         <div class="sheetActions">
           <button class="secondaryBtn" data-handling="slett" data-id="${i.id}" ${i.brukt ? 'disabled' : ''}>Trekk tilbake</button>
