@@ -1,5 +1,16 @@
 # Endringslogg
 
+## 0.4.1 — Sikkerhetsfiks: fail-closed artssynlighet
+`/security-review` av 0.4.0 avdekket at manglende `taxonId` (KI-auto-valgte
+og fritekst-registrerte funn — den vanligste registreringsveien i appen)
+ble regnet som "trygt å vise offentlig" som standard. I praksis betydde det
+at et rødlistet funn (f.eks. Ærfugl) gjenkjent av KI-en, uten at noen gjorde
+noe galt, kunne bli synlig i det offentlige laget med ekte GPS-posisjon og
+bilde. Rettet til fail-closed: ukjent/manglende `taxonId` skjules nå som
+standard i stedet for å vises (`erSynligForPublic()` i
+`worker/api/src/lib/artsvisibility.js`). Ingen funn i produksjon var
+berørt (bekreftet før fiksen ble deployet).
+
 ## 0.4.0 — Fase 3 Milestone D: offentlig lag, Mapbox-proxy, rødliste-filtrering
 Siste store arkitekturstykke i fase 3 før den fulle app-brede
 sikkerhetsgjennomgangen (v1-releasekravet). Se `konsept.md` "Offentlig lag".

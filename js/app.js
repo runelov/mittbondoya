@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.4.0';
+const APP_VERSION = '0.4.1';
 const APP_BUILD_DATE = '2026-07-12';
 
 const el = id => document.getElementById(id);

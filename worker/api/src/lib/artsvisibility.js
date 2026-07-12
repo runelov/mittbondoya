@@ -15,10 +15,17 @@ const SKJULT_FOR_PUBLIC_TAXON_IDER = new Set([
   203529, // Tjeld (NT)
 ]);
 
-// Ukjent/manglende taxonId (f.eks. fritekst-registrerte arter) regnes som
-// synlig som standard — matcher species.json sin egen standardverdi. Kun
-// kjente rødlistede/sensitive arter skjules eksplisitt.
+// Fail-closed, IKKE fail-open (sikkerhetsreview-funn, Milestone D): et
+// manglende taxonId betyr at vi IKKE kan bekrefte at arten er trygg å vise
+// offentlig, så det skal skjules — ikke vises. Dette treffer i praksis alle
+// KI-auto-gjenkjente funn (ki-client.js sitt svar inneholder aldri
+// taxonId) og fritekst-registrerte funn, som dermed forblir usynlige i det
+// offentlige laget helt til artsnavnet kan slås opp server-side (venter på
+// "Ordentlig artssøk"-milestonen, se konsept.md) — akseptabelt
+// under-eksponering er langt å foretrekke fremfor å lekke et rødlistet
+// funns posisjon ved en tilfeldighet. Kun eksplisitt kjente,
+// taxonId-bekreftede arter som ikke står i blokkeringslisten vises.
 export function erSynligForPublic(taxonId) {
-  if (!taxonId) return true;
+  if (!taxonId) return false;
   return !SKJULT_FOR_PUBLIC_TAXON_IDER.has(taxonId);
 }
