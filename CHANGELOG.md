@@ -1,5 +1,21 @@
 # Endringslogg
 
+## 0.9.5 — Fiks: unødvendig KV-bruk på cachede kartfliser
+Produkteier fikk Cloudflare-varsel om 50% av daglig Workers KV-kvote brukt
+etter egen testing (kun 10-12 registrerte funn). Rotårsak funnet i
+[tiles.js](worker/api/src/routes/tiles.js): rate-limiten (`sjekkOgTellIp`,
+1 KV-lesing + 1 KV-skriving) kjørte FØR cache-sjekken, så hver eneste
+kartflis kostet 2 KV-operasjoner uansett om den allerede lå i cachen —
+kartpanorering over noen zoom-nivåer genererer fort hundrevis av fliser.
+De seks andre KV-brukende endepunktene (innlogging, KI, artssøk,
+invitasjoner) er lavvolum og ikke del av problemet.
+
+Fikset ved å bytte rekkefølge: cache sjekkes nå FØR rate-limiten. Et
+cache-treff koster Mapbox ingenting uansett, så det er ingen grunn til å
+betale en KV-operasjon for det — kun ekte cache-misser bruker nå KV. Med
+1-års cache-levetiden fra v0.9.1 bør de aller fleste fliser fra nå av være
+KV-frie.
+
 ## 0.9.4 — Hardt zoom-tak, KI-særtrekk, periodisk sesjonsrotasjon
 Funnet ved videre funksjonell testing 2026-07-13.
 
