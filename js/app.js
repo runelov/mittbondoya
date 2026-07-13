@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.5';
+const APP_VERSION = '0.9.6';
 const APP_BUILD_DATE = '2026-07-13';
 
 const el = id => document.getElementById(id);
@@ -1473,7 +1473,7 @@ function gruppertFunn(sortertListe){
 // feilet permanent, se initMapNarKlar() — resten av appen (innlogging,
 // liste, registrering) skal likevel fungere, bare uten kartvisning.
 function renderFindsPaKart(){
-  if (mapCtx) renderFinds(mapCtx.findsLayer, synligeFunn(), 'alle');
+  if (mapCtx) renderFinds(mapCtx.map, mapCtx.findsLayer, synligeFunn(), 'alle');
 }
 
 function renderList(){

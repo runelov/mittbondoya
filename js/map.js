@@ -167,7 +167,7 @@ const ARTSTYPE_COLORS = {
   annet: '#af52de'
 };
 
-function renderFinds(findsLayer, funn, activeFilter){
+function renderFinds(map, findsLayer, funn, activeFilter){
   findsLayer.clearLayers();
   funn
     .filter(f => !activeFilter || activeFilter === 'alle' || f.artstype === activeFilter)
@@ -176,11 +176,20 @@ function renderFinds(findsLayer, funn, activeFilter){
       const marker = L.circleMarker([f.lat, f.lon], {
         radius: 9, color, fillColor: color, fillOpacity: 0.85, weight: 2
       });
-      marker.bindPopup(
+
+      // Liten popup vises kun ved hover (mus) — ren stedsinfo, bevisst uten
+      // noe "klikk for mer"-hint (avklart 2026-07-13: kartnåler oppfattes
+      // som klikkbare uten det, og hover finnes uansett ikke på touch — se
+      // konsept.md). Bygges manuelt med L.popup() i stedet for
+      // marker.bindPopup(), som internt ville bundet klikk til å åpne
+      // popupen uansett — her skal klikk gå rett til det store artspanelet.
+      const popup = L.popup({ closeButton: false, autoPan: false, offset: [0, -6] }).setContent(
         `<strong>${escapeHtml(f.art?.norsk || 'Ukjent art')}</strong><br>` +
         `<em>${escapeHtml(f.art?.latinsk || '')}</em><br>` +
         new Date(f.tidspunkt).toLocaleDateString('no-NO')
       );
+      marker.on('mouseover', () => popup.setLatLng(marker.getLatLng()).openOn(map));
+      marker.on('mouseout', () => map.closePopup(popup));
       marker.on('click', () => window.dispatchEvent(new CustomEvent('funn:selected', { detail: f })));
       marker.addTo(findsLayer);
     });

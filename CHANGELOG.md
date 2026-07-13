@@ -1,5 +1,23 @@
 # Endringslogg
 
+## 0.9.6 — Kartnåler: hover viser stedsinfo, klikk går rett til artspanelet
+Før viste klikk på en funn-nål to ting samtidig: Leaflets egen popup (fra
+`marker.bindPopup()`) OG det store artspanelet — forvirrende dobbeltvisning.
+
+- **Hover (mus)**: viser nå en liten, ren popup med art/dato — ingen
+  "klikk for mer"-hint (avklart i samtale 2026-07-13: kartnåler oppfattes
+  som klikkbare uten det, og popupen skal holdes ren).
+- **Klikk**: går rett til det store artspanelet, uten å også åpne den lille
+  popupen — popupen bygges nå manuelt med `L.popup()` i stedet for
+  `marker.bindPopup()`, som internt ville bundet klikk til å åpne den
+  uansett.
+- **Touch/mobil uendret**: hover finnes ikke på touch, så oppførselen der
+  er fortsatt ett trykk → artspanelet direkte, nå bare uten den overflødige
+  popupen.
+
+`js/map.js`: `renderFinds()` tar nå `map` som første parameter (trengs for
+å åpne/lukke popupen manuelt).
+
 ## 0.9.5 — Fiks: unødvendig KV-bruk på cachede kartfliser
 Produkteier fikk Cloudflare-varsel om 50% av daglig Workers KV-kvote brukt
 etter egen testing (kun 10-12 registrerte funn). Rotårsak funnet i
