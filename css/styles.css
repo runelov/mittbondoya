@@ -150,11 +150,15 @@ body{
 }
 
 .sheet h2{ margin: 0 0 8px; font-size: 20px; letter-spacing: -0.01em; }
+/* admin-panelet er den eneste sheeten med flere <h2> — skiller regionene
+   tydelig fra hverandre uten å legge en unødvendig linje rett under
+   sheetHandle på sheeter med bare én overskrift. */
+.sheet h2:not(:first-of-type){ margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); }
 .hint{ color: var(--ink-soft); font-size: 14px; margin: 4px 0 12px; }
 .note{ color: var(--ink-soft); font-size: 13px; min-height: 18px; }
 
 .sheet label{ display:block; font-size: 13px; font-weight: 600; margin: 10px 0 4px; }
-.sheet input[type="text"], .sheet input[type="password"], .sheet select{
+.sheet input[type="text"], .sheet input[type="password"], .sheet input[type="email"], .sheet input[type="number"], .sheet select{
   width: 100%;
   height: 48px;
   padding: 0 14px;
@@ -162,6 +166,7 @@ body{
   border: 1px solid var(--line);
   background: #f5f5f7;
   font-size: 16px;
+  margin-bottom: 12px;
 }
 .sheet textarea{
   width: 100%;
@@ -213,18 +218,50 @@ body{
 }
 .filterChip.active{ background: var(--ink); color: #fff; border-color: var(--ink); }
 
+/* sortering+gruppering: to faste dropdowns i én rad i stedet for to fulle
+   chip-rader — samme antall valg tar mindre vertikal plass, og bredden er
+   uavhengig av hvor mange alternativer det er (viktig for admin, som får
+   ett ekstra sorteringsvalg). */
+.sortGroupRow{ display: flex; gap: 8px; margin-bottom: 8px; }
+.sortGroupRow select{
+  flex: 1 1 0;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: #f5f5f7;
+  color: var(--ink);
+  font-size: 14px;
+}
+
 /* ---------- funnliste ---------- */
 
 .findRow{
-  display: flex; justify-content: space-between; align-items: center;
+  display: flex; align-items: center; gap: 10px;
   width: 100%;
   min-height: 52px;
-  padding: 0 4px;
+  padding: 6px 4px;
   border: none; border-bottom: 1px solid var(--line);
   background: transparent;
   text-align: left;
   font-size: 15px;
 }
+.findThumb{
+  flex: 0 0 auto;
+  width: 40px; height: 40px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #f0f0f2;
+}
+.findRowText{
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.findRowText strong{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.findRow .konfidensBadge{ flex: 0 0 auto; margin-left: 0; }
 .findGroupHeader{
   margin: 16px 0 4px;
   font-size: 14px;
@@ -315,10 +352,15 @@ body{
 
 .candidateCards{ display: flex; gap: 10px; overflow-x: auto; padding-bottom: 4px; }
 .candidateCard{
-  flex: 0 0 auto; min-width: 140px;
+  flex: 0 0 auto; min-width: 140px; max-width: 220px;
   padding: 14px; border-radius: var(--radius-md);
   border: 1px solid var(--line); background: #fff;
   text-align: left;
+}
+.candidateCard .saertrekk{
+  display: block; margin-top: 6px;
+  font-size: 13px; line-height: 1.35; color: var(--ink-soft);
+  white-space: normal;
 }
 
 .speciesResults{ display: flex; flex-direction: column; }

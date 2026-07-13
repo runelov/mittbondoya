@@ -1,6 +1,7 @@
 import { createRouter } from './router.js';
 import { corsHeaders } from './lib/cors.js';
 import { json } from './lib/json.js';
+import { rullerSesjonHvisNodvendig, sesjonCookieHeader } from './lib/session.js';
 import { beOmLenke, verifiser, loggUt } from './routes/auth.js';
 import { meg } from './routes/meg.js';
 import { listFunn, opprettFunn, oppdaterFunn, slettFunn, hentBilde } from './routes/funn.js';
@@ -64,13 +65,30 @@ export default {
 
     // Speiler worker/ki-proxy: fang alt herfra, gi JSON tilbake i stedet
     // for Cloudflares generiske feilside.
+    let res;
     try {
-      const res = await router.handle(request, env, ctx);
-      if (res) return res;
-      return json({ error: 'Ikke funnet.' }, 404, cors);
+      res = await router.handle(request, env, ctx);
+      if (!res) res = json({ error: 'Ikke funnet.' }, 404, cors);
     } catch (e) {
       console.error(e);
-      return json({ error: 'Uventet feil.' }, 500, cors);
+      res = json({ error: 'Uventet feil.' }, 500, cors);
     }
+    return leggTilRullertSesjonCookie(request, env, res);
   },
 };
+
+// Periodisk sesjonstoken-rotasjon (se lib/session.js sin
+// rullerSesjonHvisNodvendig) — sentralt her i stedet for i hver enkelt rute,
+// slik at IKKE hver av de ~20 route-filene selv må huske å legge på en ny
+// Set-Cookie. Kjøres etter at requestens EGEN autentisering (inne i
+// router.handle) allerede har brukt det gamle tokenet ferdig, så denne
+// forespørselen påvirkes aldri av rulleringen — kun neste.
+async function leggTilRullertSesjonCookie(request, env, response) {
+  const rullert = await rullerSesjonHvisNodvendig(request, env);
+  if (!rullert) return response;
+
+  const maxAgeSekunder = (rullert.utloper - Date.now()) / 1000;
+  const headers = new Headers(response.headers);
+  headers.append('Set-Cookie', sesjonCookieHeader(rullert.token, maxAgeSekunder));
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}

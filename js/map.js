@@ -28,6 +28,11 @@ const MAP_MAX_BOUNDS = L.latLngBounds(
   [64.8264, 10.7463]
 );
 
+// Harde per-lag zoom-tak — se initMap() for hvorfor disse spesifikke tallene
+// (Kartverkets WMTS-matrise slutter på 18, Mapbox sin ekte oppløsning på 15).
+const TOPO_MAX_ZOOM = 18;
+const SATELLITE_MAX_ZOOM = 15;
+
 function initMap(){
   const map = L.map('map', {
     zoomControl: false,
@@ -49,19 +54,23 @@ function initMap(){
     map.remove();
     throw e;
   }
-  map.setMaxZoom(20);
+  // Hardt tak på zoom, ett per kartlag — symmetrisk med setMinZoom over.
+  // Tidligere brukte vi maxNativeZoom (skalerte opp siste ekte flis i stedet
+  // for å hente fliser som ikke finnes/gir noe nytt), men det viste seg å gi
+  // et gråtomt kart i praksis i stedet for en myk oppskalering — enklere og
+  // mer robust å bare stoppe zoom-kontrollene helt ved kartlagets reelle
+  // grense, se baselayerchange-lytteren under.
+  map.setMaxZoom(TOPO_MAX_ZOOM);
 
   L.control.zoom({ position: 'bottomright' }).addTo(map);
 
   // Kartverket topografisk: gratis, tokenfritt — eneste lag offentlige
   // (uinnloggede) besøkende får se, jf. konsept.md "Offentlig lag".
-  // maxNativeZoom: 18 — Kartverkets WMTS-matrise for dette laget slutter på
-  // z18 (bekreftet 2026-07-13: z19+ gir 400 Bad Request for hele Bondøya-
-  // området, ikke bare enkeltfliser). Leaflet skalerer opp z18-flisen for
-  // dypere zoom i stedet for å be om fliser som ikke finnes.
+  // Bekreftet 2026-07-13: Kartverkets WMTS-matrise for dette laget slutter
+  // på z18 — z19+ gir 400 Bad Request for hele Bondøya-området, ikke bare
+  // enkeltfliser.
   const topo = L.tileLayer('https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png', {
-    maxZoom: 20,
-    maxNativeZoom: 18,
+    maxZoom: TOPO_MAX_ZOOM,
     attribution: '&copy; Kartverket'
   });
   topo.addTo(map);
@@ -70,14 +79,18 @@ function initMap(){
   // (se worker/api/src/routes/tiles.js) — aldri direkte mot Mapbox med et
   // klient-synlig token. Laget bygges alltid, men legges kun i
   // layer-switcheren når settInnloggingsstatus(true) er kalt.
-  // maxNativeZoom: 15 — ekte oppløsning for Bondøya-området tar slutt her;
-  // produkteier bekreftet visuelt at z16 er merkbart grøtete (2026-07-13).
-  // Utover 15 skalerer Leaflet opp siste ekte flis i stedet for å betale for
-  // et Mapbox-kall som uansett bare gir en interpolert (grøtete) flis.
+  // Ekte oppløsning for Bondøya-området tar slutt ved z15 — produkteier
+  // bekreftet visuelt at z16 er merkbart grøtete (2026-07-13).
   const satellite = L.tileLayer(window.ApiClient.flisUrlMal(), {
-    maxZoom: 20,
-    maxNativeZoom: 15,
+    maxZoom: SATELLITE_MAX_ZOOM,
     attribution: '&copy; Mapbox &copy; OpenStreetMap'
+  });
+
+  // Synkroniserer kartets harde zoom-tak med hvilket lag som faktisk er
+  // aktivt — uten dette ville map sitt eget maxZoom (satt én gang over)
+  // aldri endre seg når man bytter lag i layersControl.
+  map.on('baselayerchange', (e) => {
+    map.setMaxZoom(e.layer === satellite ? SATELLITE_MAX_ZOOM : TOPO_MAX_ZOOM);
   });
 
   const baseLayers = { 'Kartverket (terreng)': topo };
@@ -107,6 +120,11 @@ function initMap(){
       layersControl.removeLayer(satellite);
       satelliteLagtTil = false;
       topo.addTo(map);
+      // Direkte addTo() her (ikke via layersControl-radioknappene) trigger
+      // ALDRI 'baselayerchange' — uten denne linjen ville zoom-taket bli
+      // hengende på SATELLITE_MAX_ZOOM etter utlogging selv om kartet nå
+      // viser topo-laget.
+      map.setMaxZoom(TOPO_MAX_ZOOM);
     }
   }
 

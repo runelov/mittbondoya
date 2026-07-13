@@ -9,7 +9,10 @@
 // Kontrakt appen (js/ki-client.js) forventer:
 //   POST multipart/form-data: bilde=<fil>, kandidater=<JSON-array>
 //   Header: X-App-Secret: <delt hemmelighet, samme idé som GitHub-tokenet>
-//   -> 200 { kandidater: [ { norsk, latinsk, artstype, konfidens }, ... ] }
+//   -> 200 { kandidater: [ { norsk, latinsk, artstype, konfidens, saertrekk }, ... ] }
+// saertrekk: kort tekst om hva i AKKURAT DETTE bildet som peker mot denne
+// arten (og ev. skiller den fra de andre kandidatene) — vises i UI-en når KI
+// er usikker og gir flere alternativer, se candidateCard i js/app.js.
 // Pluggbart: bytt kun denne filen for å bruke en annen KI-motor (f.eks.
 // iNaturalist CV) senere uten å røre js/ki-client.js sin kontrakt.
 //
@@ -151,9 +154,16 @@ ${kandidatTekst}
 Se på bildet og gi 1-3 kandidater, sortert med mest sannsynlige først. Vær ærlig \
 om usikkerhet — ikke tving frem en lokal art hvis bildet klart viser noe annet.
 
+For HVER kandidat: skriv ett kort setning (maks ca. 20 ord, på norsk) i "saertrekk" \
+om hva du konkret ser i DETTE bildet som peker mot akkurat denne arten — og som \
+skiller den fra de andre kandidatene du foreslår (f.eks. nebbform, fargetegning, \
+vokseform, størrelsesforhold). Dette vises direkte til brukeren for å hjelpe dem \
+velge riktig når du er usikker, så vær konkret og bildespesifikk, ikke en generisk \
+artsbeskrivelse.
+
 Svar KUN med gyldig JSON i nøyaktig dette formatet, ingen annen tekst, ingen \
 markdown-kodeblokk:
-{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|pattedyr|sjøpattedyr|plante|alge|annet","konfidens":0.0}]}`;
+{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|pattedyr|sjøpattedyr|plante|alge|annet","konfidens":0.0,"saertrekk":"..."}]}`;
 }
 
 function parseModelJson(text) {

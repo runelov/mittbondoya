@@ -16,12 +16,15 @@ async function gjenkjenn(imageBlob, speciesHint){
   const data = await window.ApiClient.gjenkjennArt(imageBlob, speciesHint);
 
   // Forventet svarformat: { kandidater: [ { norsk, latinsk, artstype,
-  // konfidens }, ... ] } sortert høyest konfidens først.
+  // konfidens, saertrekk }, ... ] } sortert høyest konfidens først.
+  // saertrekk: kort, bildespesifikk begrunnelse for kandidaten (se
+  // worker/ki-proxy/src/index.js sin prompt) — vises i candidateCard i
+  // app.js når KI er usikker, for å hjelpe brukeren velge riktig.
   const kandidater = data.kandidater || [];
   const beste = kandidater[0] || null;
   const autoVelg = !!beste && beste.konfidens >= KONFIDENS_AUTO_TERSKEL;
   return {
-    beste: beste ? { art: { norsk: beste.norsk, latinsk: beste.latinsk }, konfidens: beste.konfidens, artstype: beste.artstype } : null,
+    beste: beste ? { art: { norsk: beste.norsk, latinsk: beste.latinsk }, konfidens: beste.konfidens, artstype: beste.artstype, saertrekk: beste.saertrekk } : null,
     alternativer: kandidater.slice(0, 3),
     autoVelg
   };

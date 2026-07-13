@@ -98,10 +98,9 @@
   <p class="hint">Skjul en art fra det offentlige laget selv om den ikke er rødlistet (f.eks. sensitiv lokalitet). Dette oppdaterer også allerede registrerte funn av arten, ikke bare fremtidige.</p>
   <div id="artListeAdmin" class="findList"></div>
   <div style="display:flex;flex-direction:column;gap:4px">
-    <label for="artVelgSelect">Velg art fra lokal liste (valgfritt, forhåndsutfyller under)</label>
-    <select id="artVelgSelect">
-      <option value="">— velg for å forhåndsutfylle —</option>
-    </select>
+    <label for="artSokInput">Søk art (Artsdatabanken, forhåndsutfyller under)</label>
+    <input id="artSokInput" type="text" placeholder="f.eks. multer" autocomplete="off">
+    <div id="artSokResultater" class="speciesResults"></div>
     <label for="artTaxonIdInput">TaxonId</label>
     <input id="artTaxonIdInput" type="number" min="1" step="1">
     <label for="artVisningsnavnInput">Visningsnavn</label>
@@ -180,8 +179,10 @@
   <h2>Registrerte funn</h2>
   <div id="visningRow" class="filterRow"></div>
   <div id="filterRow" class="filterRow"></div>
-  <div id="sortRow" class="filterRow"></div>
-  <div id="groupRow" class="filterRow"></div>
+  <div id="sortGroupRow" class="sortGroupRow">
+    <select id="sortSelect" aria-label="Sorter"></select>
+    <select id="groupSelect" aria-label="Grupper"></select>
+  </div>
   <div id="usikreRow" class="filterRow" hidden></div>
   <div id="findList" class="findList"></div>
 </div>

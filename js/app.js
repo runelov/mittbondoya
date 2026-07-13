@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.2';
+const APP_VERSION = '0.9.4';
 const APP_BUILD_DATE = '2026-07-13';
 
 const el = id => document.getElementById(id);
@@ -254,7 +254,6 @@ function wireAdminPanel(){
     toggleSheet('adminPanel');
     if (!el('adminPanel').hidden) {
       await renderInnstillinger();
-      renderArtVelgSelect();
       tomArtSkjema();
       await renderAdminSkjulteArter();
       tomSideSkjema();
@@ -331,14 +330,7 @@ function wireAdminPanel(){
     }
   });
 
-  el('artVelgSelect').addEventListener('change', () => {
-    const taxonId = el('artVelgSelect').value;
-    if (!taxonId) return;
-    const art = speciesCache.find((a) => String(a.taxonId) === taxonId);
-    if (!art) return;
-    el('artTaxonIdInput').value = art.taxonId;
-    el('artVisningsnavnInput').value = art.norsk;
-  });
+  wireArtSok();
 
   el('artSkjulBtn').addEventListener('click', async () => {
     const felter = {
@@ -446,14 +438,56 @@ function oppdaterFunnSynlighetKnapp(){
 
 // ---------- admin: arter (synlighet i det offentlige laget) ----------
 
-function renderArtVelgSelect(){
-  const select = el('artVelgSelect');
-  select.innerHTML = '<option value="">— velg for å forhåndsutfylle —</option>' +
-    speciesCache.map((a) => `<option value="${a.taxonId}">${escapeHtml(a.norsk)}</option>`).join('');
+// Samme lokale+live-søk-mønster som speciesSearch i registreringsflyten
+// (se renderRegisterPanel) — henter live fra Artsdatabanken via /arter/sok,
+// slik at admin kan skjule en hvilken som helst art, ikke bare de kuraterte
+// i speciesCache (som kun dekker artene appen selv foreslår ved
+// registrering).
+function wireArtSok(){
+  function renderArtSokResultater(lokale, eksterne){
+    const alle = [...lokale, ...eksterne];
+    el('artSokResultater').innerHTML =
+      lokale.map((s, i) => `<button class="speciesResult" data-i="${i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('') +
+      (eksterne.length ? '<p class="hint speciesResultsHint">Flere treff</p>' : '') +
+      eksterne.map((s, i) => `<button class="speciesResult" data-i="${lokale.length + i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('');
+
+    el('artSokResultater').querySelectorAll('.speciesResult').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const s = alle[Number(btn.dataset.i)];
+        el('artTaxonIdInput').value = s.taxonId;
+        el('artVisningsnavnInput').value = s.norsk;
+        el('artSokResultater').innerHTML = '';
+        el('artSokInput').value = s.norsk;
+      });
+    });
+  }
+
+  let sokTimer = null;
+  el('artSokInput').addEventListener('input', (ev) => {
+    const rawTerm = ev.target.value.trim();
+    const term = rawTerm.toLowerCase();
+    const lokaleTreff = term.length < 2 ? [] : speciesCache.filter(s =>
+      s.norsk.toLowerCase().includes(term) || s.latinsk.toLowerCase().includes(term)
+    ).slice(0, 6);
+    renderArtSokResultater(lokaleTreff, []);
+
+    clearTimeout(sokTimer);
+    if (term.length < 2) return;
+    sokTimer = setTimeout(async () => {
+      const eksterneTreff = await window.ApiClient.sokArter(rawTerm);
+      const lokaleNavn = new Set(lokaleTreff.map(s => s.norsk.toLowerCase()));
+      const nyeTreff = eksterneTreff.filter(s => !lokaleNavn.has(s.norsk.toLowerCase()));
+      // Ikke overskriv hvis admin har rukket å endre søket videre.
+      if (el('artSokInput').value.trim().toLowerCase() === term) {
+        renderArtSokResultater(lokaleTreff, nyeTreff);
+      }
+    }, 300);
+  });
 }
 
 function tomArtSkjema(){
-  el('artVelgSelect').value = '';
+  el('artSokInput').value = '';
+  el('artSokResultater').innerHTML = '';
   el('artTaxonIdInput').value = '';
   el('artVisningsnavnInput').value = '';
   el('artGrunnInput').value = '';
@@ -1057,6 +1091,7 @@ function renderRegisterPanel(state){
           <button class="candidateCard" data-idx="${i}">
             <strong>${escapeHtml(a.norsk)}</strong>
             <span class="konfidensBadge">${Math.round((a.konfidens||0)*100)} %</span>
+            ${a.saertrekk ? `<span class="saertrekk">${escapeHtml(a.saertrekk)}</span>` : ''}
           </button>`).join('')}
       </div>
       ${FOTOTIPS_HTML}`;
@@ -1350,16 +1385,16 @@ function wireListPanel(){
 function renderSortRow(){
   const sorteringer = erAdmin() ? [...SORTERINGER, SORTERING_KI_KONFIDENS] : SORTERINGER;
   if (!erAdmin() && activeSort === 'kiKonfidens') activeSort = 'nyeste';
-  el('sortRow').innerHTML = sorteringer.map(s =>
-    `<button class="filterChip${s.v===activeSort?' active':''}" data-s="${s.v}">${escapeHtml(s.tekst)}</button>`
+  el('sortSelect').innerHTML = sorteringer.map(s =>
+    `<option value="${s.v}"${s.v===activeSort?' selected':''}>${escapeHtml(s.tekst)}</option>`
   ).join('');
-  el('sortRow').querySelectorAll('.filterChip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeSort = btn.dataset.s;
-      el('sortRow').querySelectorAll('.filterChip').forEach(b => b.classList.toggle('active', b === btn));
-      renderList();
-    });
-  });
+  // .onchange (ikke addEventListener) — renderSortRow() kjøres på nytt hver
+  // gang listepanelet åpnes, og selectens innerHTML byttes ut, ikke selve
+  // elementet, så addEventListener ville stablet opp én lytter per åpning.
+  el('sortSelect').onchange = () => {
+    activeSort = el('sortSelect').value;
+    renderList();
+  };
 
   // "Kun usikre KI-gjenkjenninger" — admin-only, hjelper med å finne
   // gjenkjenninger som bør dobbeltsjekkes (samme terskel som appen selv
@@ -1382,16 +1417,13 @@ function renderSortRow(){
 
 function renderGroupRow(){
   const grupperinger = activeVisning === 'alle' ? [...GRUPPERINGER, GRUPPERING_BRUKER] : GRUPPERINGER;
-  el('groupRow').innerHTML = grupperinger.map(g =>
-    `<button class="filterChip${g.v===activeGroup?' active':''}" data-g="${g.v}">${escapeHtml(g.tekst)}</button>`
+  el('groupSelect').innerHTML = grupperinger.map(g =>
+    `<option value="${g.v}"${g.v===activeGroup?' selected':''}>${escapeHtml(g.tekst)}</option>`
   ).join('');
-  el('groupRow').querySelectorAll('.filterChip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeGroup = btn.dataset.g;
-      el('groupRow').querySelectorAll('.filterChip').forEach(b => b.classList.toggle('active', b === btn));
-      renderList();
-    });
-  });
+  el('groupSelect').onchange = () => {
+    activeGroup = el('groupSelect').value;
+    renderList();
+  };
 }
 
 function synligeFunn(){
@@ -1446,12 +1478,17 @@ function renderFindsPaKart(){
 
 function renderList(){
   const seksjoner = gruppertFunn(sorterteFunn(synligeFunn()));
+  const visKonfidens = erAdmin();
   el('findList').innerHTML = seksjoner.map(seksjon => `
     ${seksjon.tittel ? `<h3 class="findGroupHeader">${escapeHtml(seksjon.tittel)} <span class="hint">(${seksjon.funn.length})</span></h3>` : ''}
     ${seksjon.funn.map(f => `
       <button class="findRow" data-id="${f.id}">
-        <strong>${escapeHtml(f.art?.norsk || 'Ukjent')}</strong>
-        <span class="hint">${new Date(f.tidspunkt).toLocaleDateString('no-NO')}${f.registrertAv ? ' · ' + escapeHtml(f.registrertAv) : ''}</span>
+        ${f.bildeUrl ? `<img src="${window.ApiClient.bildeUrl(f.id)}" class="findThumb" alt="" loading="lazy">` : '<div class="findThumb"></div>'}
+        <span class="findRowText">
+          <strong>${escapeHtml(f.art?.norsk || 'Ukjent')}</strong>
+          <span class="hint">${new Date(f.tidspunkt).toLocaleDateString('no-NO')}${f.registrertAv ? ' · ' + escapeHtml(f.registrertAv) : ''}</span>
+        </span>
+        ${visKonfidens && f.kiKonfidens ? `<span class="konfidensBadge">${Math.round(f.kiKonfidens*100)} %</span>` : ''}
       </button>`).join('')}`
   ).join('') || '<p class="hint">Ingen registrerte funn ennå.</p>';
   el('findList').querySelectorAll('.findRow').forEach(btn => {

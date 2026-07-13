@@ -1,5 +1,72 @@
 # Endringslogg
 
+## 0.9.4 — Hardt zoom-tak, KI-særtrekk, periodisk sesjonsrotasjon
+Funnet ved videre funksjonell testing 2026-07-13.
+
+- **Zoom-tak er nå en hard grense, ikke myk oppskalering** (`js/map.js`):
+  forrige runde brukte `maxNativeZoom` (skalerer opp siste ekte flis i stedet
+  for å hente fliser som ikke finnes) — produkteier testet dette og fikk et
+  gråtomt kart i praksis i stedet for ønsket oppførsel. Erstattet med samme
+  mønster som `minZoom` allerede bruker: `map.setMaxZoom()` per aktivt
+  kartlag (18 Kartverket / 15 Mapbox), synkronisert via Leaflets
+  `baselayerchange`. Verifisert direkte i nettleser: tvunget `setZoom(23)`
+  stopper på 18, zoom inn-knappen får `leaflet-disabled`, kartet fortsetter å
+  vise ekte fliser gjennom hele testen.
+- **KI-særtrekk for usikre gjenkjenninger** (`worker/ki-proxy/src/index.js`,
+  `js/ki-client.js`, `js/app.js`): når KI foreslår flere kandidater, skriver
+  den nå også ett kort, bildespesifikt særtrekk per kandidat (f.eks. hva ved
+  nebbform/fargetegning i AKKURAT DETTE bildet peker mot arten) — vises
+  under hvert kandidatkort for å gjøre det lettere å velge riktig art.
+  Berører kun stien for usikre/flere-kandidater, ikke det trygge
+  auto-valget.
+- **Periodisk sesjonstoken-rotasjon** (`worker/api/src/lib/session.js`,
+  `worker/api/src/index.js`, migrasjon `0010_add_sesjon_rullert.sql`):
+  sesjonscookien stod tidligere fast i hele 30-dagers levetiden — et lekket
+  token ville vært gyldig helt til utløp. Rulleres nå til en ny tokenverdi
+  hvert 24. time av bruk (ren rotasjon — samme opprinnelige `utloper`
+  beholdes, ingen stille sesjonsforlengelse). Bevisst periodisk og ikke på
+  hvert kall: appen sender ofte parallelle forespørsler (f.eks. alle
+  funn-thumbnails samtidig), og rullering på hvert kall ville gitt et race
+  der to samtidige kall med samme cookie kunne oppheve hverandre. Rulleres
+  sentralt i `index.js` sin fetch()-handler, etter at requestens egen
+  autentisering allerede har brukt det gamle tokenet ferdig — denne
+  forespørselen påvirkes aldri, kun neste. Verifisert lokalt mot en ekte
+  D1-sesjon: gammelt token 401-er umiddelbart etter rullering, nytt token
+  fungerer og ruller ikke på nytt før 24-timersvinduet passerer igjen, og
+  `Max-Age` i den nye cookien reflekterer korrekt gjenværende tid av de 30
+  dagene (ikke en ny full periode).
+  **Krever migrasjon på både lokal og produksjon før deploy**:
+  `npm run db:migrate:local` / `npm run db:migrate:remote` i `worker/api/`.
+
+## 0.9.3 — UI-funn fra funksjonell testing: konto, funnliste, admin
+Funnet ved funksjonell testing 2026-07-13 av konto-, liste- og adminflytene.
+
+- **E-post-felt var ustylte**: `.sheet input[...]`-CSS-regelen dekket
+  `type="text"/"password"`, men ikke `type="email"` eller `type="number"` —
+  innloggings-/invitasjons-e-post og TaxonId-feltet i admin falt tilbake til
+  nettleserens default-styling (smått, ingen padding). Lagt til i selektoren,
+  pluss `margin-bottom` slik at Turnstile-widgeten ikke lenger klistrer seg
+  til e-post-feltet.
+- **Admin-panelets fem seksjoner** (innstillinger/arter/sider/invitasjoner/
+  brukere) hadde ingen visuell atskillelse — `.sheet h2` manglet topp-margin,
+  så f.eks. "Generer invitasjonslenke"-knappen satt tett inntil
+  "Admin — brukere"-overskriften. Lagt til topp-linje + luft foran hver
+  overskrift (unntatt den første i panelet).
+- **KI-konfidens vises nå i funnlisten** for admin (samme badge-stil som i
+  registreringsflyten) — dataen fantes allerede og brukes til sortering/
+  filtrering, men var aldri synlig i selve listen.
+- **Thumbnail i funnlisten**: hvert funn med bilde viser nå et lite
+  forhåndsbilde i raden (gjenbruker samme sesjonsbeskyttede bilde-URL som
+  detaljvisningen).
+- **Sortering+gruppering slått sammen til to dropdowns i én rad** i stedet
+  for to fulle chip-rader — sparer vertikal plass i funnlistepanelet, som
+  hadde opptil fem stablede filterrader for admin.
+- **Live artssøk i "Admin — arter"**: erstatter den gamle lokale
+  nedtrekkslisten (kun de ~17 kuraterte artene i `species.json`) med samme
+  søk mot Artsdatabanken som registreringsflyten allerede bruker
+  (`/arter/sok`) — admin kan nå skjule en hvilken som helst art, ikke bare
+  de som allerede er kuratert lokalt.
+
 ## 0.9.2 — Fiks: kart lastet aldri hvis #map hadde 0x0 størrelse ved oppstart
 `initMapNarKlar()` (`js/app.js`) hadde allerede et dokumentert ett-forsøks
 retry for det sjeldne tilfellet der `#map`-containeren har 0x0 størrelse idet
