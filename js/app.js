@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.10';
+const APP_VERSION = '0.9.11';
 const APP_BUILD_DATE = '2026-07-13';
 
 const el = id => document.getElementById(id);
@@ -836,11 +836,14 @@ function wireSetupPanel(){
   });
 }
 
+// Versjonen vises her (ikke bare i det admin-only ⚙️-panelet) fordi vanlige
+// innloggede brukere ellers ikke hadde noe sted å se hvilken versjon som
+// kjører — etterspurt 2026-07-13.
 function updateSyncPill(){
   const pill = el('syncStatus');
   if (!brukerCache) { pill.hidden = true; return; }
   pill.hidden = false;
-  pill.textContent = navigator.onLine ? '🟢 Tilkoblet' : '🟡 Offline';
+  pill.textContent = `${navigator.onLine ? '🟢 Tilkoblet' : '🟡 Offline'} · v${APP_VERSION}`;
 }
 
 async function trySync(){
@@ -1574,6 +1577,15 @@ async function openDetail(funn){
     ? `<img src="${window.ApiClient.bildeUrl(funn.id)}" class="previewImg" alt="">`
     : '';
 
+  // Bygges fra funn.art.taxonId når den finnes (dekker ALLE funn, ikke bare
+  // de 17 kuraterte artene i speciesCache — de aller fleste funn har nå en
+  // taxonId uansett, siden både KI-forslag og artssøket alltid setter den).
+  // s.artskartUrl er kun en reserveløsning for eldre funn uten taxonId der
+  // arten tilfeldigvis er en av de kuraterte.
+  const artskartUrl = funn.art?.taxonId
+    ? `https://artskart.artsdatabanken.no/#taxon/${funn.art.taxonId}`
+    : s.artskartUrl;
+
   el('detailContent').innerHTML = `
     ${bildeHtml}
     <h2>${escapeHtml(funn.art?.norsk || 'Ukjent art')}</h2>
@@ -1582,7 +1594,7 @@ async function openDetail(funn){
     ${s.beskrivelse ? `<p>${escapeHtml(s.beskrivelse)}</p>` : ''}
     ${count ? `<p class="hint">Registrert ${count} ganger i nærheten før (Artskart).</p>` : ''}
     <p>Registrert: ${new Date(funn.tidspunkt).toLocaleString('no-NO')}${funn.registrertAv ? ' av ' + escapeHtml(funn.registrertAv) : ''}</p>
-    ${s.artskartUrl ? `<a href="${s.artskartUrl}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}
+    ${artskartUrl ? `<a href="${escapeHtml(artskartUrl)}" target="_blank" rel="noopener">Se på Artsdatabanken →</a>` : ''}
     ${funn.erEgenRegistrering || funn.kanSlette ? `
       <div class="sheetActions">
         ${funn.erEgenRegistrering ? '<button id="redigerFunnBtn" class="secondaryBtn">Rediger</button>' : ''}

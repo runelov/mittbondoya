@@ -1,5 +1,20 @@
 # Endringslogg
 
+## 0.9.11 — Versjonsnummer synlig for alle, Artsdatabanken-lenke på alle funn
+Funnet ved funksjonell testing 2026-07-13.
+
+- **Versjonsnummer var kun synlig for admin** (⚙️-panelet er admin-only
+  siden v0.9.0) — vanlige innloggede brukere hadde ingen måte å se hvilken
+  versjon som kjørte. Vises nå i "Tilkoblet"-pillen øverst
+  (`🟢 Tilkoblet · v0.9.11`), synlig for alle innloggede uansett rolle.
+- **Artsdatabanken-lenken i detaljvisningen manglet for de fleste funn**:
+  lenken ble kun bygget fra den lokalt kuraterte 17-arts-lista
+  (`speciesCache`), ikke fra funnet sin egen `taxonId` — så et funn av
+  f.eks. torsk eller blåskjell (utenfor den kuraterte lista, men med gyldig
+  taxonId fra artssøket) viste ingen lenke i det hele tatt. Bygges nå
+  direkte fra `funn.art.taxonId` når den finnes, som dekker praktisk talt
+  alle funn — den kuraterte lista er nå kun en reserveløsning.
+
 ## 0.9.10 — Nye artstyper: fisk, skjell, krepsdyr
 Fullfører den kritiske gjennomgangen av artstyper fra 2026-07-13: kystnært
 dyreliv (torsk/hyse, blåskjell, strandkrabbe) havnet tidligere i "annet"
