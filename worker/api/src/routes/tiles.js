@@ -48,9 +48,10 @@ export async function hentFlis({ request, env, ctx, params }) {
     status: 200,
     headers: {
       'Content-Type': flisRes.headers.get('Content-Type') || 'image/jpeg',
-      // Kartfliser endres ikke — trygt med lang levetid både i CF-cachen og
-      // i nettleseren.
-      'Cache-Control': 'public, max-age=604800',
+      // Kartfliser for en fast koordinat endrer seg aldri — trygt med svært
+      // lang levetid både i CF-cachen og i nettleseren, som reduserer
+      // gjentatte kall mot Mapbox (free tier) ved neste besøk/PoP-treff.
+      'Cache-Control': 'public, max-age=31536000, immutable',
       ...cors,
     },
   });

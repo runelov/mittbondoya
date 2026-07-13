@@ -43,8 +43,13 @@ function initMap(){
 
   // Kartverket topografisk: gratis, tokenfritt — eneste lag offentlige
   // (uinnloggede) besøkende får se, jf. konsept.md "Offentlig lag".
+  // maxNativeZoom: 18 — Kartverkets WMTS-matrise for dette laget slutter på
+  // z18 (bekreftet 2026-07-13: z19+ gir 400 Bad Request for hele Bondøya-
+  // området, ikke bare enkeltfliser). Leaflet skalerer opp z18-flisen for
+  // dypere zoom i stedet for å be om fliser som ikke finnes.
   const topo = L.tileLayer('https://cache.kartverket.no/v1/wmts/1.0.0/topo/default/webmercator/{z}/{y}/{x}.png', {
     maxZoom: 20,
+    maxNativeZoom: 18,
     attribution: '&copy; Kartverket'
   });
   topo.addTo(map);
@@ -53,8 +58,13 @@ function initMap(){
   // (se worker/api/src/routes/tiles.js) — aldri direkte mot Mapbox med et
   // klient-synlig token. Laget bygges alltid, men legges kun i
   // layer-switcheren når settInnloggingsstatus(true) er kalt.
+  // maxNativeZoom: 15 — ekte oppløsning for Bondøya-området tar slutt her;
+  // produkteier bekreftet visuelt at z16 er merkbart grøtete (2026-07-13).
+  // Utover 15 skalerer Leaflet opp siste ekte flis i stedet for å betale for
+  // et Mapbox-kall som uansett bare gir en interpolert (grøtete) flis.
   const satellite = L.tileLayer(window.ApiClient.flisUrlMal(), {
     maxZoom: 20,
+    maxNativeZoom: 15,
     attribution: '&copy; Mapbox &copy; OpenStreetMap'
   });
 

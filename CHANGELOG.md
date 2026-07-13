@@ -1,5 +1,26 @@
 # Endringslogg
 
+## 0.9.1 — Kartzoom-grenser og lengre Mapbox-cache
+Funnet ved funksjonell testing 2026-07-13: for dypt zoom ga uventede
+resultater på begge kartlagene.
+
+- **Kartverket-laget** (`js/map.js`): `maxNativeZoom: 18` lagt til. Bekreftet
+  ved direkte testing at Kartverkets WMTS-matrise for Bondøya-området
+  slutter på z18 — z19+ ga 400 Bad Request for alle fliser, ikke bare
+  enkelte. Leaflet skalerer nå opp z18-flisen for dypere zoom i stedet for
+  å be om fliser som ikke finnes.
+- **Mapbox-laget** (`js/map.js`): `maxNativeZoom: 15` lagt til. Produkteier
+  bekreftet visuelt at z16 er merkbart grøtete (interpolert av Mapbox).
+  Sparer også Mapbox-kall (free tier) siden Leaflet ikke lenger henter
+  fliser dypere enn 15 — hvert zoom-nivå dypere er ~4x flere unike fliser.
+- **Cloudflare-cache for Mapbox-fliser** (`worker/api/src/routes/tiles.js`):
+  `Cache-Control` økt fra 7 dager til 1 år (`immutable`) — fliser for en
+  fast koordinat endrer seg aldri, så både CF-kanten og nettleseren kan
+  holde på dem mye lenger uten risiko. Anbefalt i tillegg (ikke kode):
+  skru på Tiered Cache i Cloudflare-dashbordet for bondoya.no, siden
+  `caches.default` er per-datasenter og ellers gir cache-miss mot Mapbox
+  første gang hver PoP treffes.
+
 ## 0.9.0 — Fem gjenstående fase 3-punkter før v1
 Lukker gapet mellom konsept.md sin fase 3-liste og faktisk kode, avdekket
 ved en gjennomgang etter at v0.8.2 sin fulle app-wide sikkerhetsreview var
