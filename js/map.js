@@ -164,6 +164,7 @@ const ARTSTYPE_COLORS = {
   pattedyr: '#5e5ce6',
   alge: '#34c759',
   plante: '#ff9500',
+  sopp: '#a2845e',
   annet: '#af52de'
 };
 

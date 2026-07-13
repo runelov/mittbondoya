@@ -55,6 +55,11 @@ function utledArtstype(taxon) {
   if (taxon.TaxonGroup === 'Fugler') return 'fugl';
   if (taxon.TaxonGroup === 'Alger') return 'alge';
   if (taxon.Kingdom === 'Plantae') return 'plante';
+  // Bekreftet live 2026-07-13 (søk "mult"): Multiclavula-artene har
+  // Kingdom "Fungi" — havnet tidligere i "annet" sammen med alt annet
+  // ukategoriserbart, noe som gjorde flere sopparter umulige å skille fra
+  // hverandre i søkeresultatet.
+  if (taxon.Kingdom === 'Fungi') return 'sopp';
   if (taxon.Class === 'Mammalia') {
     return SJOPATTEDYR_FAMILIER.has(taxon.Family) ? 'sjøpattedyr' : 'pattedyr';
   }

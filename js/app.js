@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.6';
+const APP_VERSION = '0.9.7';
 const APP_BUILD_DATE = '2026-07-13';
 
 const el = id => document.getElementById(id);
@@ -436,6 +436,18 @@ function oppdaterFunnSynlighetKnapp(){
     : 'Skru på offentlig funnvisning';
 }
 
+// Delt av renderArtSokResultater (admin, under) og renderSpeciesResults
+// (registreringsflyten) — samme kort-mal begge steder. Viser artstype i
+// tillegg til navn: uten den kan flere treff på samme søkeord (typisk flere
+// sopparter, se samtale 2026-07-13 om "multer") være umulig å skille fra
+// hverandre uten å åpne hvert enkelt.
+function speciesResultButtonHtml(s, i){
+  return `<button class="speciesResult" data-i="${i}">
+    ${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em>
+    <span class="speciesType">${escapeHtml(s.artstype || 'ukjent type')}</span>
+  </button>`;
+}
+
 // ---------- admin: arter (synlighet i det offentlige laget) ----------
 
 // Samme lokale+live-søk-mønster som speciesSearch i registreringsflyten
@@ -447,9 +459,9 @@ function wireArtSok(){
   function renderArtSokResultater(lokale, eksterne){
     const alle = [...lokale, ...eksterne];
     el('artSokResultater').innerHTML =
-      lokale.map((s, i) => `<button class="speciesResult" data-i="${i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('') +
+      lokale.map((s, i) => speciesResultButtonHtml(s, i)).join('') +
       (eksterne.length ? '<p class="hint speciesResultsHint">Flere treff</p>' : '') +
-      eksterne.map((s, i) => `<button class="speciesResult" data-i="${lokale.length + i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('');
+      eksterne.map((s, i) => speciesResultButtonHtml(s, lokale.length + i)).join('');
 
     el('artSokResultater').querySelectorAll('.speciesResult').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1166,9 +1178,9 @@ function renderRegisterPanel(state){
   function renderSpeciesResults(lokale, eksterne){
     const alle = [...lokale, ...eksterne];
     el('speciesResults').innerHTML =
-      lokale.map((s, i) => `<button class="speciesResult" data-i="${i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('') +
+      lokale.map((s, i) => speciesResultButtonHtml(s, i)).join('') +
       (eksterne.length ? '<p class="hint speciesResultsHint">Flere treff</p>' : '') +
-      eksterne.map((s, i) => `<button class="speciesResult" data-i="${lokale.length + i}">${escapeHtml(s.norsk)} <em>${escapeHtml(s.latinsk)}</em></button>`).join('');
+      eksterne.map((s, i) => speciesResultButtonHtml(s, lokale.length + i)).join('');
 
     el('speciesResults').querySelectorAll('.speciesResult').forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -1362,7 +1374,7 @@ function wireListPanel(){
     });
   });
 
-  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
+  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'annet'];
   el('filterRow').innerHTML = artstyper.map(t =>
     `<button class="filterChip${t===activeFilter?' active':''}" data-t="${t}">${t}</button>`
   ).join('');
@@ -1544,7 +1556,7 @@ async function openDetail(funn){
   });
 }
 
-const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'annet'];
+const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'annet'];
 
 // Setter tekstverdier via .value-egenskapen i stedet for å interpolere dem inn
 // i value="..."-attributter i markup — et artsnavn kan være fri tekst (se

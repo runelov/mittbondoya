@@ -1,5 +1,32 @@
 # Endringslogg
 
+## 0.9.7 — Artstype i artssøk + ny "Sopp"-kategori
+Funnet ved funksjonell testing av artssøket (Admin — arter): søk på
+"multer" ga flere urelaterte sopparter tilbake, umulig å skille fra
+hverandre uten å åpne hvert enkelt treff.
+
+- **Artstype vises nå under hvert søketreff** (delt mellom Admin — arter
+  sitt søk og registreringsflytens artssøk, samme kortmal) — `js/app.js`,
+  `css/styles.css`.
+- **Ny egen "Sopp"-kategori**: Kingdom Fungi havnet tidligere i "annet"
+  sammen med alt ukategoriserbart, som gjorde artstype-visningen lite nyttig
+  for nettopp sopp (alle så like ut som "Annet"). Lagt til i
+  `utledArtstype()` (`worker/api/src/routes/arter.js`), kartfarge
+  (`js/map.js`), filterlisten i funnlisten, admin sitt artstype-redigerings-
+  skjema, og KI-promptens gyldige kategorier (`worker/ki-proxy/src/index.js`).
+- **Migrasjon `0011_add_sopp_artstype.sql`**: `funn`-tabellens CHECK-
+  constraint tillot ikke `artstype='sopp'` — SQLite støtter ikke å endre en
+  CHECK direkte, så tabellen bygges om (samme mønster som SQLite selv
+  anbefaler). Verifisert lokalt: skjema, indeks og eksisterende rader intakt
+  etter migrasjon, og en testrad med `artstype='sopp'` kunne settes inn uten
+  feil.
+  **Krever migrasjon på produksjon før deploy**: `cd worker/api && npm run
+  db:migrate:remote`.
+- Ikke løst (ligger hos Artsdatabanken, ikke noe vi kan fikse): søk på
+  "multer" gir fortsatt ingen treff — kun "molte" (den offisielle
+  navneformen) finner arten. Søket matcher tydeligvis delvis mot latinsk
+  navn, ikke fritekst mot norsk populærnavn.
+
 ## 0.9.6 — Kartnåler: hover viser stedsinfo, klikk går rett til artspanelet
 Før viste klikk på en funn-nål to ting samtidig: Leaflets egen popup (fra
 `marker.bindPopup()`) OG det store artspanelet — forvirrende dobbeltvisning.
