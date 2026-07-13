@@ -1,5 +1,33 @@
 # Endringslogg
 
+## 0.9.8 — Synlige sorter/grupper-etiketter + rullerings-overlapp for sesjon
+Funnet ved funksjonell testing 2026-07-13.
+
+- **Sorter/Grupper-dropdownene i funnlisten manglet synlig etikett** — kun
+  `aria-label` (usynlig for seende brukere), så det fremgikk ikke hva
+  hver dropdown styrte. Lagt til synlige "Sorter"/"Grupper"-tekster over
+  hver (`index.html`, `css/styles.css`).
+- **Sesjonstoken-rotasjon (v0.9.4) kunne føre til "mistet innlogging"**:
+  produkteier rapporterte at det skjedde av og til, spesielt ved lukking/
+  gjenåpning av PWA-en på iPhone. Sannsynlig årsak: hvis klienten ikke
+  rekker å motta/lagre den nye Set-Cookie-en fra en rotasjon (f.eks. appen
+  lagt i bakgrunnen midt i en forespørsel), sto den igjen med et token
+  serveren allerede hadde forkastet.
+  Fikset med et 5-minutters overlappingsvindu (migrasjon
+  `0012_add_sesjon_grace_period.sql`, nye kolonner `forrige_hash`/
+  `forrige_utloper` på `sesjoner`): det GAMLE tokenet godtas fortsatt en
+  kort stund etter rotasjon, ved siden av det nye. Svekker ikke
+  rotasjonens sikkerhetshensikt nevneverdig (én gang i døgnet, maks 5
+  minutter). Verifisert lokalt end-to-end: gammelt token virker rett
+  etter rotasjon (simulerer en klient som gikk glipp av Set-Cookie), 401
+  etter at overlappet er utløpt, og det nyeste tokenet virker gjennom
+  hele forløpet.
+  **Krever migrasjon på produksjon før deploy**: `cd worker/api && npm run
+  db:migrate:remote`.
+- Droppet idé om thumbnail av foreslått art i KI-gjenkjenning (Artsdatabanken
+  eksponerer ingen bilde-URL via APIet — ville krevd en ny ekstern
+  bildekilde for marginal gevinst utover særtrekk-teksten fra v0.9.4).
+
 ## 0.9.7 — Artstype i artssøk + ny "Sopp"-kategori
 Funnet ved funksjonell testing av artssøket (Admin — arter): søk på
 "multer" ga flere urelaterte sopparter tilbake, umulig å skille fra

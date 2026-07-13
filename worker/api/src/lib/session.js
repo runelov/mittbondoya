@@ -18,6 +18,14 @@ const LEVETID_MS = 30 * 24 * 60 * 60 * 1000; // 30 dager
 // selve tokenverdien. Se konsept.md.
 const ROTASJON_INTERVALL_MS = 24 * 60 * 60 * 1000; // 24 timer
 
+// Hvor lenge det FORRIGE tokenet fortsatt godtas etter en rotasjon — dekker
+// klienter som ikke rekker å motta/lagre den nye Set-Cookie-en (observert i
+// praksis som "mister innlogging" på iOS ved lukking/gjenåpning av PWA-en
+// midt i en forespørsel). Kort nok til at det ikke reelt svekker
+// rotasjonens sikkerhetshensikt (én gang i døgnet, i maks 5 minutter —
+// neglisjerbar utvidelse av eksponeringsvinduet for et evt. lekket token).
+const ROTASJON_OVERLAPP_MS = 5 * 60 * 1000; // 5 minutter
+
 export async function opprettSesjon(brukerId, env) {
   const token = randomToken();
   const hash = await sha256Hex(token);
@@ -55,13 +63,20 @@ export async function requireSession(request, env) {
   if (!token) return null;
 
   const hash = await sha256Hex(token);
+  const na = Date.now();
+  // Godtar enten det GJELDENDE tokenet, eller det FORRIGE innenfor
+  // rullerings-overlappen (se ROTASJON_OVERLAPP_MS) — dekker klienten som
+  // ikke rakk å lagre den nyeste Set-Cookie-en.
   const rad = await env.DB.prepare(
     `SELECT brukere.id, brukere.epost, brukere.kortnavn, brukere.rolle, brukere.status
      FROM sesjoner
      JOIN brukere ON brukere.id = sesjoner.bruker_id
-     WHERE sesjoner.hash = ?1 AND sesjoner.utloper > ?2`
+     WHERE sesjoner.utloper > ?2 AND (
+       sesjoner.hash = ?1
+       OR (sesjoner.forrige_hash = ?1 AND sesjoner.forrige_utloper > ?2)
+     )`
   )
-    .bind(hash, Date.now())
+    .bind(hash, na)
     .first();
 
   if (!rad || rad.status !== 'aktiv') return null;
@@ -95,12 +110,14 @@ export async function rullerSesjonHvisNodvendig(request, env) {
   // rullering i samme UPDATE (samme "WHERE i selve skrivingen"-mønster som
   // innloggingstokens sin engangsbruk i auth.js) — unngår en separat
   // les-så-skriv-race mot en samtidig forespørsel som rullerer først.
+  // forrige_hash/forrige_utloper lagrer det gamle tokenet med en kort
+  // overlappende gyldighet (ROTASJON_OVERLAPP_MS), se requireSession().
   const rad = await env.DB.prepare(
-    `UPDATE sesjoner SET hash = ?1, rullert = ?2
+    `UPDATE sesjoner SET hash = ?1, rullert = ?2, forrige_hash = ?3, forrige_utloper = ?2 + ?5
      WHERE hash = ?3 AND utloper > ?2 AND rullert <= ?4
      RETURNING utloper`
   )
-    .bind(nyHash, na, gammelHash, na - ROTASJON_INTERVALL_MS)
+    .bind(nyHash, na, gammelHash, na - ROTASJON_INTERVALL_MS, ROTASJON_OVERLAPP_MS)
     .first();
 
   if (!rad) return null;

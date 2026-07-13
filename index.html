@@ -180,8 +180,14 @@
   <div id="visningRow" class="filterRow"></div>
   <div id="filterRow" class="filterRow"></div>
   <div id="sortGroupRow" class="sortGroupRow">
-    <select id="sortSelect" aria-label="Sorter"></select>
-    <select id="groupSelect" aria-label="Grupper"></select>
+    <div class="sortGroupCol">
+      <span class="sortGroupLabel">Sorter</span>
+      <select id="sortSelect" aria-label="Sorter"></select>
+    </div>
+    <div class="sortGroupCol">
+      <span class="sortGroupLabel">Grupper</span>
+      <select id="groupSelect" aria-label="Grupper"></select>
+    </div>
   </div>
   <div id="usikreRow" class="filterRow" hidden></div>
   <div id="findList" class="findList"></div>
