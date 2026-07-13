@@ -60,6 +60,12 @@ function utledArtstype(taxon) {
   // ukategoriserbart, noe som gjorde flere sopparter umulige å skille fra
   // hverandre i søkeresultatet.
   if (taxon.Kingdom === 'Fungi') return 'sopp';
+  // Bekreftet live 2026-07-13 (torsk/hyse → "Fisker", blåskjell → "Bløtdyr",
+  // strandkrabbe → "Krepsdyr") — kystnære funn som tidligere alle havnet i
+  // "annet" sammen med alt ukategoriserbart.
+  if (taxon.TaxonGroup === 'Fisker') return 'fisk';
+  if (taxon.TaxonGroup === 'Bløtdyr') return 'skjell';
+  if (taxon.TaxonGroup === 'Krepsdyr') return 'krepsdyr';
   if (taxon.Class === 'Mammalia') {
     return SJOPATTEDYR_FAMILIER.has(taxon.Family) ? 'sjøpattedyr' : 'pattedyr';
   }

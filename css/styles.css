@@ -71,6 +71,20 @@ body{
   font-weight: 600;
 }
 
+/* Synlig, tappbar markør for at funn er filtrert (se oppdaterFilterIndikator
+   i app.js) — egen rad under topBar i stedet for inni, slik at den ikke
+   forstyrrer topBar sin faste ikon-plassering (space-between). */
+.filterIndicator{
+  position: fixed;
+  top: calc(68px + var(--safe-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  border: none;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
 /* ---------- FAB ---------- */
 
 .fab{
@@ -263,13 +277,21 @@ body{
 }
 .findRowText strong{ overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .findRow .konfidensBadge{ flex: 0 0 auto; margin-left: 0; }
+/* .findGroup (<details>) i stedet for en flat <h3> gir kollapsbare grupper
+   gratis via nettleserens egen disclosure-triangel — se lukkedeGrupper i
+   app.js for hvorfor tilstanden må huskes på tvers av re-render. Marginen
+   flyttet fra headeren (som nå er <summary>, alltid first-child av SIN
+   egen <details>) til selve .findGroup-wrapperen, som faktisk er
+   first-child av #findList kun for den aller første gruppen. */
+.findGroup{ margin-top: 16px; }
+.findGroup:first-child{ margin-top: 4px; }
 .findGroupHeader{
-  margin: 16px 0 4px;
+  cursor: pointer;
   font-size: 14px;
   font-weight: 700;
   color: var(--ink-soft);
+  padding: 4px 0;
 }
-.findGroupHeader:first-child{ margin-top: 4px; }
 .findGroupHeader .hint{ font-weight: 400; }
 
 /* ---------- registrering ---------- */

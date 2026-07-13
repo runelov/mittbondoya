@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.8';
+const APP_VERSION = '0.9.10';
 const APP_BUILD_DATE = '2026-07-13';
 
 const el = id => document.getElementById(id);
@@ -1357,6 +1357,7 @@ function wireListPanel(){
   // logg inn/ut mens panelet er lukket, og admin-only-radene skal reflektere
   // gjeldende status, ikke status ved sideinnlasting.
   el('listToggle').addEventListener('click', () => { renderSortRow(); renderList(); toggleSheet('listPanel'); });
+  el('filterIndicator').addEventListener('click', () => { renderSortRow(); renderList(); toggleSheet('listPanel', true); });
 
   const visninger = ['alle', 'mine'];
   el('visningRow').innerHTML = visninger.map(v =>
@@ -1374,18 +1375,20 @@ function wireListPanel(){
     });
   });
 
-  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'annet'];
-  el('filterRow').innerHTML = artstyper.map(t =>
-    `<button class="filterChip${t===activeFilter?' active':''}" data-t="${t}">${t}</button>`
+  // Dropdown i stedet for chip-rad (endret 2026-07-13) — chip-raden krevde
+  // horisontal scroll for å se alle artstyper, og ble bare verre etter hvert
+  // som flere artstyper (sopp, ev. fisk/skjell) kom til. Statisk liste, ikke
+  // avhengig av innloggingsstatus som sortSelect/groupSelect — trengs derfor
+  // ikke en egen renderFilterRow() kalt på nytt ved hver åpning.
+  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
+  el('filterSelect').innerHTML = artstyper.map(t =>
+    `<option value="${t}"${t===activeFilter?' selected':''}>${t === 'alle' ? 'Alle typer' : t.charAt(0).toUpperCase() + t.slice(1)}</option>`
   ).join('');
-  el('filterRow').querySelectorAll('.filterChip').forEach(btn => {
-    btn.addEventListener('click', () => {
-      activeFilter = btn.dataset.t;
-      el('filterRow').querySelectorAll('.filterChip').forEach(b => b.classList.toggle('active', b === btn));
-      renderFindsPaKart();
-      renderList();
-    });
-  });
+  el('filterSelect').onchange = () => {
+    activeFilter = el('filterSelect').value;
+    renderFindsPaKart();
+    renderList();
+  };
 
   renderGroupRow();
   renderSortRow();
@@ -1418,6 +1421,7 @@ function renderSortRow(){
     el('kunUsikreChip').addEventListener('click', () => {
       kunUsikre = !kunUsikre;
       el('kunUsikreChip').classList.toggle('active', kunUsikre);
+      renderFindsPaKart();
       renderList();
     });
   } else {
@@ -1486,14 +1490,43 @@ function gruppertFunn(sortertListe){
 // liste, registrering) skal likevel fungere, bare uten kartvisning.
 function renderFindsPaKart(){
   if (mapCtx) renderFinds(mapCtx.map, mapCtx.findsLayer, synligeFunn(), 'alle');
+  oppdaterFilterIndikator();
 }
+
+// Synlig markør over kartet når funn faktisk er filtrert bort — uten denne
+// var eneste måte å oppdage et aktivt filter på å åpne Registrerte funn
+// (rapportert 2026-07-13: brukte lang tid før man skjønte hvorfor enkelte
+// funn "manglet" på kartet etter å ha satt et filter og navigert bort en
+// stund). Kalles fra renderFindsPaKart() — samme knutepunkt som allerede
+// kjøres hver gang et filter endres.
+function oppdaterFilterIndikator(){
+  const deler = [];
+  if (activeFilter !== 'alle') deler.push(activeFilter.charAt(0).toUpperCase() + activeFilter.slice(1));
+  if (activeVisning !== 'alle') deler.push('Mine funn');
+  if (kunUsikre) deler.push('Kun usikre');
+
+  const el_ = el('filterIndicator');
+  if (deler.length) {
+    el_.textContent = `🔍 ${deler.join(' · ')}`;
+    el_.hidden = false;
+  } else {
+    el_.hidden = true;
+  }
+}
+
+// Husker hvilke grupper brukeren selv har lukket, på tvers av re-render
+// (renderList() kjøres på nytt ved hvert filter-/sorterings-/synkbytte) —
+// uten dette ville et lukket-valg blitt tilbakestilt til åpent igjen ved
+// neste re-render. Nøkkelen er selve gruppetittelen (art/artstype/måned/
+// bruker), url-kodet i data-attributtet for å unngå å måtte HTML-
+// attributt-escape en fritekst-tittel (f.eks. et brukernavn med anførselstegn).
+let lukkedeGrupper = new Set();
 
 function renderList(){
   const seksjoner = gruppertFunn(sorterteFunn(synligeFunn()));
   const visKonfidens = erAdmin();
-  el('findList').innerHTML = seksjoner.map(seksjon => `
-    ${seksjon.tittel ? `<h3 class="findGroupHeader">${escapeHtml(seksjon.tittel)} <span class="hint">(${seksjon.funn.length})</span></h3>` : ''}
-    ${seksjon.funn.map(f => `
+  el('findList').innerHTML = seksjoner.map(seksjon => {
+    const funnHtml = seksjon.funn.map(f => `
       <button class="findRow" data-id="${f.id}">
         ${f.bildeUrl ? `<img src="${window.ApiClient.bildeUrl(f.id)}" class="findThumb" alt="" loading="lazy">` : '<div class="findThumb"></div>'}
         <span class="findRowText">
@@ -1501,8 +1534,26 @@ function renderList(){
           <span class="hint">${new Date(f.tidspunkt).toLocaleDateString('no-NO')}${f.registrertAv ? ' · ' + escapeHtml(f.registrertAv) : ''}</span>
         </span>
         ${visKonfidens && f.kiKonfidens ? `<span class="konfidensBadge">${Math.round(f.kiKonfidens*100)} %</span>` : ''}
-      </button>`).join('')}`
-  ).join('') || '<p class="hint">Ingen registrerte funn ennå.</p>';
+      </button>`).join('');
+
+    if (!seksjon.tittel) return funnHtml;
+
+    const apen = !lukkedeGrupper.has(seksjon.tittel);
+    return `
+      <details class="findGroup"${apen ? ' open' : ''} data-tittel="${encodeURIComponent(seksjon.tittel)}">
+        <summary class="findGroupHeader">${escapeHtml(seksjon.tittel)} <span class="hint">(${seksjon.funn.length})</span></summary>
+        ${funnHtml}
+      </details>`;
+  }).join('') || '<p class="hint">Ingen registrerte funn ennå.</p>';
+
+  el('findList').querySelectorAll('.findGroup').forEach(details => {
+    details.addEventListener('toggle', () => {
+      const tittel = decodeURIComponent(details.dataset.tittel);
+      if (details.open) lukkedeGrupper.delete(tittel);
+      else lukkedeGrupper.add(tittel);
+    });
+  });
+
   el('findList').querySelectorAll('.findRow').forEach(btn => {
     btn.addEventListener('click', () => {
       const f = funnCache.find(x => String(x.id) === btn.dataset.id);
@@ -1556,7 +1607,7 @@ async function openDetail(funn){
   });
 }
 
-const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'annet'];
+const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
 
 // Setter tekstverdier via .value-egenskapen i stedet for å interpolere dem inn
 // i value="..."-attributter i markup — et artsnavn kan være fri tekst (se

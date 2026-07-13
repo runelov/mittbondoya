@@ -1,7 +1,7 @@
 import { randomToken } from './crypto.js';
 import { erSynligForPublic, betruaTaxonId } from './artsvisibility.js';
 
-export const ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'annet'];
+export const ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
 
 const MAKS_BILDE_BYTES = 8 * 1024 * 1024;
 const TILLATTE_BILDETYPER = { 'image/jpeg': 'jpg', 'image/webp': 'webp' };

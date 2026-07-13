@@ -1,5 +1,46 @@
 # Endringslogg
 
+## 0.9.10 — Nye artstyper: fisk, skjell, krepsdyr
+Fullfører den kritiske gjennomgangen av artstyper fra 2026-07-13: kystnært
+dyreliv (torsk/hyse, blåskjell, strandkrabbe) havnet tidligere i "annet"
+sammen med sopp før v0.9.7. Bekreftet mot Artsdatabanken (`TaxonGroup`):
+"Fisker" → fisk, "Bløtdyr" → skjell, "Krepsdyr" → krepsdyr —
+`utledArtstype()` i `worker/api/src/routes/arter.js`.
+
+Samme mønster som Sopp-kategorien: nye kartfarger (teal/rosa/rød,
+`js/map.js`), lagt til i artstype-dropdownen og admin sitt
+redigeringsskjema (`js/app.js`), KI-promptens gyldige kategorier
+(`worker/ki-proxy/src/index.js`), og migrasjon
+`0013_add_fisk_skjell_krepsdyr_artstype.sql` (samme ombygning av
+`funn`-tabellens CHECK-constraint som 0011, samme forsiktighet med
+eksplisitt kolonneliste). Verifisert lokalt: skjema/indeks intakt,
+testinnsetting med alle tre nye artstyper lykkes, dropdown og kartfarger
+viser riktig i nettleser.
+
+**Krever migrasjon på produksjon før deploy**: `cd worker/api && npm run
+db:migrate:remote`.
+
+## 0.9.9 — Filterindikator på kartet, kollapsbare grupper, artstype som dropdown
+Funnet ved funksjonell testing 2026-07-13 av funnlisten.
+
+- **Synlig markør på kartet når funn er filtrert**: satte du et filter
+  (artstype/"Mine funn"/"kun usikre") og navigerte bort/tilbake i kartet,
+  var eneste måte å oppdage det på å åpne Registrerte funn. Ny liten
+  tappbar pill ("🔍 Fugl" e.l.) rett under topBar, synlig så lenge et
+  filter er aktivt — trykk på den for å hoppe rett til listepanelet. Fikset
+  også en liten inkonsistens oppdaget underveis: "Kun usikre KI-
+  gjenkjenninger" (admin) oppdaterte tidligere kun listen, ikke kartet.
+- **Kollapsbare grupper** i Registrerte funn: hver gruppe (art/artstype/
+  måned/bruker) er nå en `<details>` — klikk overskriften for å
+  åpne/lukke. Husker hvilke grupper du selv har lukket på tvers av
+  re-render (bytte av sortering/filter nullstiller ikke valget ditt
+  lenger).
+- **Artstype-filteret er nå en dropdown** i stedet for en chip-rad som
+  krevde horisontal scroll — samme mønster som Sorter/Grupper, alle tre nå
+  i én kompakt rad ("Type / Sorter / Grupper"). Løser både plassproblemet
+  og skalerer bedre etter hvert som flere artstyper kommer (fisk/skjell
+  under vurdering).
+
 ## 0.9.8 — Synlige sorter/grupper-etiketter + rullerings-overlapp for sesjon
 Funnet ved funksjonell testing 2026-07-13.
 

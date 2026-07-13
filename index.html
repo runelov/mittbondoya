@@ -32,6 +32,8 @@
   <button id="adminToggle" class="iconBtn" aria-label="Admin" title="Admin" hidden>🛡️</button>
 </header>
 
+<button id="filterIndicator" class="pill filterIndicator" hidden></button>
+
 <!-- Konto / innlogging (magic-link mot bondoya-api) -->
 <div id="accountPanel" class="sheet" hidden>
   <div class="sheetHandle"></div>
@@ -178,8 +180,11 @@
   <div class="sheetHandle"></div>
   <h2>Registrerte funn</h2>
   <div id="visningRow" class="filterRow"></div>
-  <div id="filterRow" class="filterRow"></div>
   <div id="sortGroupRow" class="sortGroupRow">
+    <div class="sortGroupCol">
+      <span class="sortGroupLabel">Type</span>
+      <select id="filterSelect" aria-label="Artstype"></select>
+    </div>
     <div class="sortGroupCol">
       <span class="sortGroupLabel">Sorter</span>
       <select id="sortSelect" aria-label="Sorter"></select>

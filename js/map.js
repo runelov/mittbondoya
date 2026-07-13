@@ -165,6 +165,9 @@ const ARTSTYPE_COLORS = {
   alge: '#34c759',
   plante: '#ff9500',
   sopp: '#a2845e',
+  fisk: '#30b0c7',
+  skjell: '#ff375f',
+  krepsdyr: '#ff3b30',
   annet: '#af52de'
 };
 
