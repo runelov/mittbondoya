@@ -88,11 +88,18 @@ async function syncQueue(onProgress){
       let art = item.art;
       let kiKonfidens = item.kiKonfidens;
       let kiAlternativer = item.kiAlternativer;
-      if (!art && item.imageBlob && window.KiClient && window.KiClient.isConfigured()) {
-        const kiResultat = await window.KiClient.gjenkjenn(item.imageBlob);
-        art = kiResultat.beste ? kiResultat.beste.art : null;
-        kiKonfidens = kiResultat.beste ? kiResultat.beste.konfidens : 0;
-        kiAlternativer = kiResultat.alternativer || [];
+      if (!art && item.imageBlob && window.KiClient) {
+        // Egen try/catch her — en KI-feil (f.eks. Workeren midlertidig nede)
+        // skal falle tilbake til "Ikke identifisert" under, ikke feile hele
+        // synk-forsøket for dette funnet (se den ytre catch-blokken).
+        try {
+          const kiResultat = await window.KiClient.gjenkjenn(item.imageBlob);
+          art = kiResultat.beste ? kiResultat.beste.art : null;
+          kiKonfidens = kiResultat.beste ? kiResultat.beste.konfidens : 0;
+          kiAlternativer = kiResultat.alternativer || [];
+        } catch (e) {
+          console.warn('KI-gjenkjenning feilet under synk', e);
+        }
       }
 
       await window.ApiClient.opprettFunn({

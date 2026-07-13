@@ -37,6 +37,10 @@ export async function hentFlis({ request, env, ctx, params }) {
   const mapboxUrl = `https://api.mapbox.com/styles/v1/mapbox/satellite-streets-v12/tiles/${z}/${x}/${y}?access_token=${env.MAPBOX_SECRET_TOKEN}`;
   const flisRes = await fetch(mapboxUrl);
   if (!flisRes.ok) {
+    // Midlertidig diagnostikk for å finne rotårsaken til 502-feil rapportert
+    // av produkteier — logger ALDRI mapboxUrl (inneholder MAPBOX_SECRET_TOKEN
+    // som spørrestreng), kun status/body fra Mapbox sitt svar.
+    console.error('Mapbox-flis feilet', flisRes.status, await flisRes.text());
     return json({ error: 'Kunne ikke hente kartflis.' }, 502, cors);
   }
 

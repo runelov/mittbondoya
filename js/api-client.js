@@ -267,6 +267,19 @@ async function hentAdminDashboard() {
   return res.json();
 }
 
+// Sesjonsbeskyttet KI-gjenkjenning — se worker/api/src/routes/ki.js. Denne
+// Workeren legger på den delte hemmeligheten mot worker/ki-proxy server-side,
+// så klienten trenger aldri å kjenne til noen delt hemmelighet selv.
+async function gjenkjennArt(imageBlob, kandidater) {
+  const form = new FormData();
+  form.append('bilde', imageBlob, 'funn.jpg');
+  form.append('kandidater', JSON.stringify(kandidater || []));
+  const res = await kall('/ki/gjenkjenn', { method: 'POST', body: form });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `KI-gjenkjenning feilet (${res.status}).`);
+  return data;
+}
+
 // Live søk mot Artsdatabanken (via Workerens /arter/sok-proxy), se
 // worker/api/src/routes/arter.js. Kastes bevisst ikke ved feil — brukes fra
 // en debouncet input-handler der en enkelt mislykket forespørsel ikke bør
@@ -324,4 +337,5 @@ window.ApiClient = {
   visArtIgjen,
   hentAdminDashboard,
   sokArter,
+  gjenkjennArt,
 };

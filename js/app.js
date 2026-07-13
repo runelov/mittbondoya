@@ -760,17 +760,12 @@ function wireSetupPanel(){
     el('ghRepo').value = cfg.repo;
     el('ghToken').value = cfg.token;
   }
-  el('kiProxyUrl').value = window.KiClient.getProxyUrl();
-  el('kiSharedSecret').value = window.KiClient.getSharedSecret();
-
   el('setupToggle').addEventListener('click', () => toggleSheet('setupPanel'));
 
   el('ghConnectBtn').addEventListener('click', async () => {
     const owner = el('ghOwner').value.trim();
     const repo = el('ghRepo').value.trim();
     const token = el('ghToken').value.trim();
-    const kiUrl = el('kiProxyUrl').value.trim();
-    const kiSecret = el('kiSharedSecret').value.trim();
     if (!owner || !repo || !token) {
       el('ghNote').textContent = 'Fyll ut eier, repo og token.';
       return;
@@ -779,8 +774,6 @@ function wireSetupPanel(){
     try {
       const branch = await window.GhStore.detectDefaultBranch(owner, repo, token);
       window.GhStore.setConfig({ owner, repo, token, branch });
-      if (kiUrl) window.KiClient.setProxyUrl(kiUrl);
-      if (kiSecret) window.KiClient.setSharedSecret(kiSecret);
       el('ghNote').textContent = `Tilkoblet (branch: ${branch}).`;
       await refreshFromRepo();
       toggleSheet('setupPanel', false);
@@ -949,17 +942,13 @@ async function onImageCaptured(e){
 // pendingImageBlob, uavhengig av hva KI faktisk analyserte.
 async function kjorKiGjenkjenning(){
   renderRegisterPanel({ scanning: true });
-  if (window.KiClient.isConfigured()) {
-    try {
-      const hint = buildSpeciesHintList();
-      pendingKiResultat = await window.KiClient.gjenkjenn(pendingKiCropBlob || pendingImageBlob, hint);
-      console.debug('KI-svar', pendingKiResultat);
-    } catch (err) {
-      console.warn('KI-gjenkjenning feilet', err);
-      pendingKiResultat = null;
-    }
-  } else {
-    console.debug('KI-proxy er ikke konfigurert (Innstillinger → KI-proxy URL) — hopper over gjenkjenning.');
+  try {
+    const hint = buildSpeciesHintList();
+    pendingKiResultat = await window.KiClient.gjenkjenn(pendingKiCropBlob || pendingImageBlob, hint);
+    console.debug('KI-svar', pendingKiResultat);
+  } catch (err) {
+    console.warn('KI-gjenkjenning feilet', err);
+    pendingKiResultat = null;
   }
   renderRegisterPanel({ scanning: false });
 }

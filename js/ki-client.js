@@ -1,63 +1,22 @@
 // js/ki-client.js
-// Klient for KI-artsgjenkjenning. Snakker med den lille Cloudflare Worker-
-// proxyen (se worker/ki-proxy/) som skjuler selve AI-nøkkelen — denne filen
-// vet ingenting om hvilken KI-motor som brukes bak proxyen, kun kontrakten
-// (bilde inn, strukturerte kandidater ut). Det gjør det trivielt å bytte
-// KI-motor (Claude-vision <-> iNaturalist CV) uten å røre resten av appen.
-
-const KI_PROXY_URL_KEY = 'bondoya-ki-proxy-url';
-const KI_SHARED_SECRET_KEY = 'bondoya-ki-shared-secret';
+// Tynn klient for KI-artsgjenkjenning. Snakker med bondoya-api sin
+// sesjonsbeskyttede /ki/gjenkjenn-rute (se worker/api/src/routes/ki.js), som
+// selv videresender til den faktiske KI-proxyen (worker/ki-proxy/) og legger
+// på den delte hemmeligheten server-side — denne filen (og dermed hver
+// brukers nettleser) kjenner aldri til noen delt hemmelighet lenger, kun
+// admin ved oppsett av selve Workerne. Vet ingenting om hvilken KI-motor som
+// brukes bak proxyen, kun kontrakten (bilde inn, strukturerte kandidater ut).
 const KONFIDENS_AUTO_TERSKEL = 0.75; // over dette: velg automatisk. Under: vis alternativer.
-
-// Engangs-migrering: api.bondoya.no eies nå av den nye API-workeren, ikke
-// lenger KI-proxyen (som flyttet til ki.bondoya.no). Uten dette måtte alle
-// 10-15 brukere manuelt oppdatert ⚙️-panelet sitt. Kjøres ved innlasting.
-(function migrerGammelKiProxyUrl(){
-  const lagret = localStorage.getItem(KI_PROXY_URL_KEY) || '';
-  if (lagret.startsWith('https://api.bondoya.no')) {
-    localStorage.setItem(KI_PROXY_URL_KEY, lagret.replace('https://api.bondoya.no', 'https://ki.bondoya.no'));
-  }
-})();
-
-function getProxyUrl(){
-  return localStorage.getItem(KI_PROXY_URL_KEY) || '';
-}
-function setProxyUrl(url){
-  localStorage.setItem(KI_PROXY_URL_KEY, url);
-}
-function getSharedSecret(){
-  return localStorage.getItem(KI_SHARED_SECRET_KEY) || '';
-}
-function setSharedSecret(secret){
-  localStorage.setItem(KI_SHARED_SECRET_KEY, secret);
-}
-function isConfigured(){
-  return !!getProxyUrl();
-}
 
 // speciesHint: liste med { norsk, latinsk, artstype, plausibilitet } — bygget
 // av app.js fra species.json + (hvis tilgjengelig) artskart-bondoya.json, se
 // buildSpeciesHintList() der. Sendes med som kontekst til KI-motoren slik at
 // den vektlegger stedsforankret plausibilitet (se konsept.md).
 async function gjenkjenn(imageBlob, speciesHint){
-  const url = getProxyUrl();
-  if (!url) throw new Error('KI-proxy er ikke konfigurert.');
+  const data = await window.ApiClient.gjenkjennArt(imageBlob, speciesHint);
 
-  const form = new FormData();
-  form.append('bilde', imageBlob, 'funn.jpg');
-  form.append('kandidater', JSON.stringify(speciesHint || []));
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'X-App-Secret': getSharedSecret() },
-    body: form
-  });
-  if (!res.ok) throw new Error(`KI-proxy svarte ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-
-  // Forventet svarformat fra proxyen:
-  // { kandidater: [ { norsk, latinsk, artstype, konfidens }, ... ] } sortert
-  // høyest konfidens først.
+  // Forventet svarformat: { kandidater: [ { norsk, latinsk, artstype,
+  // konfidens }, ... ] } sortert høyest konfidens først.
   const kandidater = data.kandidater || [];
   const beste = kandidater[0] || null;
   const autoVelg = !!beste && beste.konfidens >= KONFIDENS_AUTO_TERSKEL;
@@ -68,4 +27,4 @@ async function gjenkjenn(imageBlob, speciesHint){
   };
 }
 
-window.KiClient = { getProxyUrl, setProxyUrl, getSharedSecret, setSharedSecret, isConfigured, gjenkjenn, KONFIDENS_AUTO_TERSKEL };
+window.KiClient = { gjenkjenn, KONFIDENS_AUTO_TERSKEL };
