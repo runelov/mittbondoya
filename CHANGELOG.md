@@ -1,5 +1,19 @@
 # Endringslogg
 
+## 0.9.24 — Cache-busting query-strenger på css/js
+Nettverk-først-fiksen i 0.9.23 løste service worker-cachen, men vanlig
+HTTP-cache i nettleseren for `<link>`/`<script>`-taggene i `index.html` var
+fortsatt uversjonert. Lagt til `?v=0.9.24` på alle lokale css/js-referanser
+i `index.html`, og oppdatert `sw.js` sin `SHELL_FILES`-liste til å matche
+(inkl. lagt til `js/api-client.js`, som manglet fra precache-listen fra
+før). `CACHE_NAME` følger nå `APP_VERSION` direkte i stedet for en egen
+manuelt tellende `v2`-streng.
+
+**Krever manuelt vedlikehold**: query-strengen (`?v=...`) i `index.html` og
+`SHELL_FILES`/`CACHE_NAME` i `sw.js` må bumpes sammen med `APP_VERSION` i
+`js/app.js` ved hver fremtidige deploy — ingen build-steg holder disse i
+sync automatisk.
+
 ## 0.9.23 — Service worker: nettverk-først i stedet for stale-while-revalidate
 Svar på "gråmåke viser ingen artsomtale" — data var korrekt både i
 produksjons-D1 og via direkte API-kall (verifisert mot lokal dev med

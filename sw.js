@@ -2,21 +2,21 @@
 // (HTML/CSS/JS/manifest/ikoner) laster selv uten nett. All ekte data (GitHub
 // API, Mapbox-fliser, KI-proxy) går alltid rett til nettverket, uberørt.
 
-// v2: bytt fra cache-først til nettverk-først (se fetch-lytteren under for
-// hvorfor) — ny cache-versjon her sørger for at gamle, "stale-while-
-// revalidate"-cachede nettlesere får en ren start i stedet for å arve noe
-// som ble lagret under den forrige, feilaktige strategien.
-const CACHE_NAME = 'bondoya-shell-v2';
+// CACHE_NAME følger APP_VERSION (js/app.js) fra og med 0.9.24 — bump denne
+// sammen med APP_VERSION og query-strengene under ved hver deploy, så en
+// ny versjon alltid får en ren cache i stedet for å arve forrige sin.
+const CACHE_NAME = 'bondoya-shell-v0.9.24';
 const SHELL_FILES = [
   './',
   './index.html',
   './manifest.json',
-  './css/styles.css',
-  './js/app.js',
-  './js/github-store.js',
-  './js/offline-queue.js',
-  './js/ki-client.js',
-  './js/map.js',
+  './css/styles.css?v=0.9.24',
+  './js/app.js?v=0.9.24',
+  './js/github-store.js?v=0.9.24',
+  './js/api-client.js?v=0.9.24',
+  './js/offline-queue.js?v=0.9.24',
+  './js/ki-client.js?v=0.9.24',
+  './js/map.js?v=0.9.24',
   './data/species.json',
   './icons/icon-192.png',
   './icons/icon-512.png'
