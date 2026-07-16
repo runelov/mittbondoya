@@ -143,7 +143,8 @@ function buildPrompt(kandidater) {
       ).join('\n')
     : '(ingen stedsspesifikk kandidatliste tilgjengelig)';
 
-  return `Du identifiserer arter (fugl, planter, alger, sopp, sjøpattedyr, fisk, skjell, krepsdyr) fra feltbilder tatt på \
+  return `Du identifiserer arter (fugl, planter, alger, sopp, sjøpattedyr, fisk, bløtdyr, krepsdyr, \
+insekt, edderkoppdyr, krypdyr, amfibium, nesledyr, pigghud, leddorm) fra feltbilder tatt på \
 Bondøya, en liten værhard kystøy i Ytre Vikna, Trøndelag, Norge. Dette er en homogen \
 kystlokalitet — innlandsarter og fjellarter er svært usannsynlige her.
 
@@ -163,7 +164,7 @@ artsbeskrivelse.
 
 Svar KUN med gyldig JSON i nøyaktig dette formatet, ingen annen tekst, ingen \
 markdown-kodeblokk:
-{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|pattedyr|sjøpattedyr|plante|alge|sopp|fisk|skjell|krepsdyr|annet","konfidens":0.0,"saertrekk":"..."}]}`;
+{"kandidater":[{"norsk":"...","latinsk":"...","artstype":"fugl|pattedyr|sjøpattedyr|plante|alge|sopp|fisk|bløtdyr|krepsdyr|insekt|edderkoppdyr|krypdyr|amfibium|nesledyr|pigghud|leddorm|annet","konfidens":0.0,"saertrekk":"..."}]}`;
 }
 
 function parseModelJson(text) {

@@ -2,8 +2,18 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.12';
+const APP_VERSION = '0.9.13';
 const APP_BUILD_DATE = '2026-07-16';
+
+// Speilbilde av ARTSTYPER i worker/api/src/lib/taxonomi.js — appen har
+// ingen build-step som lar de to dele en fil, så listen må holdes i synk
+// manuelt. Brukt av både artstype-filteret (med "alle" i tillegg) og
+// redigeringsskjemaets dropdown.
+const ARTSTYPER = [
+  'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk',
+  'bløtdyr', 'krepsdyr', 'insekt', 'edderkoppdyr', 'krypdyr', 'amfibium',
+  'nesledyr', 'pigghud', 'leddorm', 'annet',
+];
 
 const el = id => document.getElementById(id);
 
@@ -1154,8 +1164,16 @@ function renderRegisterPanel(state){
   // pendingArt overlever re-rendering av panelet (f.eks. etter posisjonsvalg
   // i kart, se pickPositionOnMap) — kun sett KI sitt auto-forslag som
   // startverdi hvis brukeren ikke allerede har valgt noe selv.
+  //
+  // taxonId følger med her og i de to setValgt()-kallene under (fra søk og
+  // KI-kandidater) — manglet siden aller første MVP-commit, med den
+  // konsekvens at art_taxon_id ble NULL i databasen for absolutt alle funn
+  // (bekreftet 2026-07-16 mot produksjons-D1), uansett om arten kom fra et
+  // ekte Artsdatabanken-søketreff. KI-kandidater har uansett aldri en
+  // taxonId (ki-proxy gjør ren bildegjenkjenning, ikke taxonoppslag) — der
+  // blir feltet fortsatt undefined, som er korrekt.
   if (!pendingArt && beste && autoVelg) {
-    pendingArt = { norsk: beste.art.norsk, latinsk: beste.art.latinsk, artstype: beste.artstype };
+    pendingArt = { norsk: beste.art.norsk, latinsk: beste.art.latinsk, artstype: beste.artstype, taxonId: beste.art.taxonId };
   }
   if (pendingArt) el('speciesSearch').value = pendingArt.norsk;
   updateSaveButton();
@@ -1176,7 +1194,7 @@ function renderRegisterPanel(state){
   c.querySelectorAll('.candidateCard').forEach(btn => {
     btn.addEventListener('click', () => {
       const a = alternativer[Number(btn.dataset.idx)];
-      setValgt({ norsk: a.norsk, latinsk: a.latinsk, artstype: a.artstype });
+      setValgt({ norsk: a.norsk, latinsk: a.latinsk, artstype: a.artstype, taxonId: a.taxonId });
     });
   });
 
@@ -1196,7 +1214,7 @@ function renderRegisterPanel(state){
     el('speciesResults').querySelectorAll('.speciesResult').forEach((btn) => {
       btn.addEventListener('click', () => {
         const s = alle[Number(btn.dataset.i)];
-        setValgt({ norsk: s.norsk, latinsk: s.latinsk, artstype: s.artstype });
+        setValgt({ norsk: s.norsk, latinsk: s.latinsk, artstype: s.artstype, taxonId: s.taxonId });
         el('speciesResults').innerHTML = '';
         el('speciesSearch').value = s.norsk;
       });
@@ -1391,8 +1409,7 @@ function wireListPanel(){
   // som flere artstyper (sopp, ev. fisk/skjell) kom til. Statisk liste, ikke
   // avhengig av innloggingsstatus som sortSelect/groupSelect — trengs derfor
   // ikke en egen renderFilterRow() kalt på nytt ved hver åpning.
-  const artstyper = ['alle', 'fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
-  el('filterSelect').innerHTML = artstyper.map(t =>
+  el('filterSelect').innerHTML = ['alle', ...ARTSTYPER].map(t =>
     `<option value="${t}"${t===activeFilter?' selected':''}>${t === 'alle' ? 'Alle typer' : t.charAt(0).toUpperCase() + t.slice(1)}</option>`
   ).join('');
   el('filterSelect').onchange = () => {
@@ -1627,7 +1644,7 @@ async function openDetail(funn){
   });
 }
 
-const REDIGERBARE_ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
+const REDIGERBARE_ARTSTYPER = ARTSTYPER;
 
 // Setter tekstverdier via .value-egenskapen i stedet for å interpolere dem inn
 // i value="..."-attributter i markup — et artsnavn kan være fri tekst (se

@@ -2,6 +2,7 @@ import { json } from '../lib/json.js';
 import { corsHeaders } from '../lib/cors.js';
 import { requireSession } from '../lib/session.js';
 import { sjekkOgTellIp } from '../lib/ratelimit.js';
+import { utledArtstype, ARTSKART_API } from '../lib/taxonomi.js';
 
 // Live søkeproxy mot Artsdatabankens offentlige taxon-API — samme vert
 // fetch_artskart.py (bondoya-db) allerede bruker for taxon-ID-oppslag.
@@ -9,7 +10,6 @@ import { sjekkOgTellIp } from '../lib/ratelimit.js';
 // artssøk"): et direkte oppslag er enklere, alltid ferskt, og krever ingen
 // ny privat-repo-pipeline. Delstrengsøk på norsk populærnavn verifisert
 // 2026-07-12 (term=ørn ga treff).
-const ARTSKART_API = 'https://artskart.artsdatabanken.no/publicapi/api';
 const MAKS_SOK_PER_IP_TIME = 60;
 const MAKS_TREFF = 15;
 // Udokumentert, men verifisert empirisk 2026-07-12: endepunktet returnerer
@@ -20,18 +20,6 @@ const MAKS_TREFF = 15;
 // sorterer selv på relevans (se sorterEtterRelevans) før vi kutter til
 // MAKS_TREFF.
 const HENT_TAKE = 40;
-
-// Artsdatabankens TaxonGroup/Kingdom/Class/Family dekker ikke appens
-// artstype-skjema 1:1 (spesielt sjøpattedyr vs. pattedyr — Artsdatabanken
-// har ingen egen "Sjøpattedyr"-gruppe, steinkobbe havner under samme
-// TaxonGroup "Pattedyr" som f.eks. elg). Verifisert live 2026-07-12 mot
-// faktiske treff (steinkobbe → TaxonGroup "Pattedyr", Family "Phocidae";
-// sukkertare → TaxonGroup "Alger"). Liten hardkodet familie-allowliste for
-// de sjøpattedyrfamiliene som realistisk kan dukke opp ved Bondøya.
-const SJOPATTEDYR_FAMILIER = new Set([
-  'Phocidae', 'Otariidae', 'Odobenidae',
-  'Balaenopteridae', 'Delphinidae', 'Monodontidae', 'Physeteridae', 'Ziphiidae',
-]);
 
 // Eksakt treff først, deretter navn som starter med søketermen (korteste —
 // mest sannsynlig basisarten — foran lengre sammensetninger), resten sist.
@@ -49,27 +37,6 @@ function sorterEtterRelevans(treff, term) {
     if (ra !== rb) return ra - rb;
     return a.norsk.length - b.norsk.length;
   });
-}
-
-function utledArtstype(taxon) {
-  if (taxon.TaxonGroup === 'Fugler') return 'fugl';
-  if (taxon.TaxonGroup === 'Alger') return 'alge';
-  if (taxon.Kingdom === 'Plantae') return 'plante';
-  // Bekreftet live 2026-07-13 (søk "mult"): Multiclavula-artene har
-  // Kingdom "Fungi" — havnet tidligere i "annet" sammen med alt annet
-  // ukategoriserbart, noe som gjorde flere sopparter umulige å skille fra
-  // hverandre i søkeresultatet.
-  if (taxon.Kingdom === 'Fungi') return 'sopp';
-  // Bekreftet live 2026-07-13 (torsk/hyse → "Fisker", blåskjell → "Bløtdyr",
-  // strandkrabbe → "Krepsdyr") — kystnære funn som tidligere alle havnet i
-  // "annet" sammen med alt ukategoriserbart.
-  if (taxon.TaxonGroup === 'Fisker') return 'fisk';
-  if (taxon.TaxonGroup === 'Bløtdyr') return 'skjell';
-  if (taxon.TaxonGroup === 'Krepsdyr') return 'krepsdyr';
-  if (taxon.Class === 'Mammalia') {
-    return SJOPATTEDYR_FAMILIER.has(taxon.Family) ? 'sjøpattedyr' : 'pattedyr';
-  }
-  return 'annet';
 }
 
 export async function sokArter({ request, env }) {

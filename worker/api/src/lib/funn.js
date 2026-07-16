@@ -1,7 +1,6 @@
 import { randomToken } from './crypto.js';
 import { erSynligForPublic, betruaTaxonId } from './artsvisibility.js';
-
-export const ARTSTYPER = ['fugl', 'sjøpattedyr', 'pattedyr', 'plante', 'alge', 'sopp', 'fisk', 'skjell', 'krepsdyr', 'annet'];
+import { ARTSTYPER, hentAutoritativArtstype } from './taxonomi.js';
 
 const MAKS_BILDE_BYTES = 8 * 1024 * 1024;
 const TILLATTE_BILDETYPER = { 'image/jpeg': 'jpg', 'image/webp': 'webp' };
@@ -68,11 +67,21 @@ export async function validerFunnFelter(felter, env) {
   const artLatinsk = (felter.art_latinsk || '').trim() || null;
   if (artLatinsk && artLatinsk.length > MAKS_TEKST_LENGDE) throw new Error('Latinsk navn er for langt.');
 
-  const artstype = felter.artstype;
-  if (!ARTSTYPER.includes(artstype)) throw new Error('Ugyldig artstype.');
+  if (!ARTSTYPER.includes(felter.artstype)) throw new Error('Ugyldig artstype.');
 
   const artTaxonIdRaw = felter.art_taxon_id ? parseInt(felter.art_taxon_id, 10) : null;
   if (felter.art_taxon_id && !Number.isFinite(artTaxonIdRaw)) throw new Error('Ugyldig taxonId.');
+
+  // Autoritativ artstype fra taxonId når en finnes — se hentAutoritativArtstype
+  // i lib/taxonomi.js for hvorfor (samme "aldri stol på klienten"-prinsipp som
+  // synlig_for_public under, men et helt separat formål: dette er kun
+  // kategorisering/visning, IKKE sikkerhetsgrensen for rødliste-synlighet, så
+  // det bruker artTaxonIdRaw direkte og ikke den strengt kuraterte
+  // betruaTaxonId()). Faller tilbake til klientens artstype ved manglende
+  // taxonId eller Artsdatabanken-feil (fail-open her er trygt — verste fall
+  // er en feilkategorisert "annet" fremfor en lagringsfeil).
+  const autoritativArtstype = await hentAutoritativArtstype(artTaxonIdRaw);
+  const artstype = autoritativArtstype || felter.artstype;
 
   const lat = parseFloat(felter.lat);
   const lon = parseFloat(felter.lon);
@@ -99,14 +108,17 @@ export async function validerFunnFelter(felter, env) {
     }
   }
 
-  // Kun stol på taxonId dersom det faktisk samsvarer med et kjent artsnavn
-  // i den kuraterte katalogen (se lib/artsvisibility.js) — hindrer at et
-  // vilkårlig/ikke-skjult taxonId sendes sammen med et annet (ev.
-  // rødlistet) artsnavn for å lekke posisjonen offentlig. Servergenerert
-  // fra dette punktet av, aldri klientoppgitt direkte — samme prinsipp
-  // som registrert_av_bruker_id.
-  const artTaxonId = betruaTaxonId(artTaxonIdRaw, artNorsk);
-  const synligForPublic = await erSynligForPublic(artTaxonId, env);
+  // artTaxonId (det som lagres på funnet) er artTaxonIdRaw uendret — bare
+  // syntaktisk validert over, ingen ytterligere innskrenking. Dette var
+  // tidligere feilaktig satt til betruaTaxonId()-resultatet, som bare
+  // godtar taxonId for de 17 kuraterte artene — konsekvensen var at
+  // art_taxon_id ble NULL i databasen for alle andre funn (bekreftet
+  // 2026-07-16: samtlige 32 funn i produksjon har NULL taxonId, uansett om
+  // arten kom fra et ekte søketreff). betruaTaxonId() er en helt separat,
+  // strengt kuratert sikkerhetssjekk KUN for synlig_for_public under (se
+  // lib/artsvisibility.js) — den skal ikke også styre hva som lagres.
+  const artTaxonId = artTaxonIdRaw;
+  const synligForPublic = await erSynligForPublic(betruaTaxonId(artTaxonIdRaw, artNorsk), env);
 
   return { artNorsk, artLatinsk, artstype, artTaxonId, lat, lon, tidspunkt, kiKonfidens, kiAlternativer, synligForPublic };
 }

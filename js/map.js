@@ -166,8 +166,15 @@ const ARTSTYPE_COLORS = {
   plante: '#ff9500',
   sopp: '#a2845e',
   fisk: '#30b0c7',
-  skjell: '#ff375f',
+  bløtdyr: '#ff375f',
   krepsdyr: '#ff3b30',
+  insekt: '#d9a521',
+  edderkoppdyr: '#3a3a3c',
+  krypdyr: '#7c9a3c',
+  amfibium: '#14b8a6',
+  nesledyr: '#7c2d78',
+  pigghud: '#5c6b73',
+  leddorm: '#8b4513',
   annet: '#af52de'
 };
 

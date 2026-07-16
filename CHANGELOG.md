@@ -1,5 +1,56 @@
 # Endringslogg
 
+## 0.9.13 — TaxonId ble aldri lagret, sju nye artstyper, artstype-utledning flyttet server-side
+Funnet ved gjennomgang av "Annet"-kategoriserte funn 2026-07-16 (se
+0.9.10-notatet om kamskjell/taskekrabbe): en dypere sjekk avdekket at
+**taxonId aldri har blitt lagret for noe funn**, ikke bare de historiske
+"Annet"-tilfellene.
+
+- **Klientbug siden aller første MVP-commit**: `setValgt()` i registrerings-
+  flyten kopierte aldri `taxonId` fra søketreff/KI-kandidater over til
+  `pendingArt` — bekreftet 2026-07-16 mot produksjons-D1: samtlige 32 funn
+  har `art_taxon_id = NULL`, inkludert funn registrert dagen før. Dette
+  gjorde 0.9.11 sin Artsdatabanken-lenke virkningsløs for alt utenom de 17
+  kuraterte artene. Fikset i `js/app.js` (alle tre stedene `pendingArt`
+  settes).
+- **Server-bug i samme slengen**: `validerFunnFelter()` satte det lagrede
+  `art_taxon_id` til resultatet av `betruaTaxonId()` — en streng
+  sikkerhetssjekk ment KUN for rødliste-synlighet (`synlig_for_public`), som
+  bare godtar taxonId for de 17 kuraterte artene. Denne innsnevret dermed
+  også hva som ble lagret, uavhengig av klientbugen over. `art_taxon_id`
+  lagres nå uendret fra klientens (syntaktisk validerte) verdi;
+  `betruaTaxonId()` brukes fortsatt — helt uendret — kun til
+  synlighetssjekken, se `worker/api/src/lib/funn.js`.
+- **Artstype er nå autoritativ server-side, ikke klientoppgitt**: når et funn
+  har en taxonId, slår `validerFunnFelter()` opp arten på nytt mot
+  Artsdatabanken og setter artstype selv (`hentAutoritativArtstype()` i ny
+  `worker/api/src/lib/taxonomi.js`) — samme "aldri stol på klienten"-prinsipp
+  som synlig_for_public, nå utvidet til kategorisering. Klientens artstype
+  brukes kun som fallback når taxonId mangler (rene KI-gjetninger uten
+  søkebekreftelse).
+- **Sju nye artstyper**: `insekt`, `edderkoppdyr`, `krypdyr`, `amfibium`,
+  `nesledyr`, `pigghud`, `leddorm` — samme hull som fisk/skjell/krepsdyr i
+  0.9.10 (havnet i "annet" fordi `utledArtstype()` manglet grener for dem).
+  Innsekter og edderkoppdyr nøkler på `Class` (Artsdatabanken splitter dem
+  over et dusin ulike `TaxonGroup`), resten på `TaxonGroup` — se
+  `worker/api/src/lib/taxonomi.js` for kilde-verifisering per gruppe.
+- **`skjell` omdøpt til `bløtdyr`**: dekket allerede hele Mollusca (landsnegl,
+  blekksprut — ikke bare skjell). Ingen produksjonsrader hadde `artstype =
+  'skjell'`, så ingen dataflytting nødvendig utover migrasjonens UPDATE
+  (for sikkerhets skyld mot lokal test-DB).
+- `utledArtstype()`/`ARTSTYPER` konsolidert til én delt kilde
+  (`worker/api/src/lib/taxonomi.js`) brukt av både søk og lagring — de lå
+  tidligere som to hardkodede kopier som kunne gli fra hverandre.
+- Nytt review-script (kjøres IKKE automatisk):
+  `worker/api/scripts/foresla-taxonid-backfill.mjs` — foreslår taxonId +
+  artstype for de 32 eksisterende funnene uten taxonId, til manuell
+  gjennomgang rad for rad.
+
+**Krever migrasjon på produksjon før deploy**: `cd worker/api && npm run
+db:migrate:remote` (migrasjon 0014, samme ombygningsmønster som 0011/0013).
+**Krever også deploy av worker/ki-proxy** (oppdatert artstype-liste i
+KI-prompten), ikke bare worker/api og den statiske appen.
+
 ## 0.9.12 — Fjernet falsk 401-konsollfeil for besøkende, tydeligere pålogging-CTA, Turnstile-knapp låst til utfordring er løst
 Funnet ved funksjonell testing 2026-07-16.
 
