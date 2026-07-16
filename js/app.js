@@ -2,7 +2,7 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.14';
+const APP_VERSION = '0.9.15';
 const APP_BUILD_DATE = '2026-07-16';
 
 // Speilbilde av ARTSTYPER i worker/api/src/lib/taxonomi.js — appen har
@@ -987,6 +987,23 @@ function nearbyCountFor(norskNavn){
   return artskartCache.filter(o => (o.art || '').toLowerCase() === norskNavn.toLowerCase()).length;
 }
 
+// Referansebilder for KI-kandidatene, hentet async ETTER at kortene
+// allerede vises (samme "ikke-blokkerende visningsdetalj"-mønster som
+// lastArtsbeskrivelse() i funndetaljer) — KI-kandidater har ingen taxonId
+// å slå opp mot (se /arter/miniatyrbilde), så dette er et navnebasert,
+// ukachet oppslag per kandidat, parallelt. isConnected-sjekken luker ut et
+// sent svar for et kort som ikke lenger finnes (brukeren avbrøt/re-rendret
+// panelet før svaret kom tilbake).
+function lastKandidatMiniatyrer(alternativer){
+  alternativer.forEach(async (a, i) => {
+    const wrap = document.querySelector(`.candidateThumbWrap[data-thumb-idx="${i}"]`);
+    if (!wrap) return;
+    const { thumbnailUrl } = await window.ApiClient.hentArtMiniatyrbilde(a.latinsk);
+    if (!thumbnailUrl || !wrap.isConnected) return;
+    wrap.innerHTML = `<img src="${escapeHtml(thumbnailUrl)}" class="candidateThumb" alt="">`;
+  });
+}
+
 // ---------- registreringsflyt ----------
 
 function wireRegisterFlow(){
@@ -1201,12 +1218,18 @@ function renderRegisterPanel(state){
     kiHtml = `
       <p class="hint">KI er usikker — velg riktig alternativ:</p>
       <div class="candidateCards">
-        ${alternativer.map((a, i) => `
+        ${alternativer.map((a, i) => {
+          const count = nearbyCountFor(a.norsk);
+          return `
           <button class="candidateCard" data-idx="${i}">
+            <span class="candidateThumbWrap" data-thumb-idx="${i}"></span>
             <strong>${escapeHtml(a.norsk)}</strong>
+            <span class="artstypeBadge">${escapeHtml(a.artstype || '')}</span>
             <span class="konfidensBadge">${Math.round((a.konfidens||0)*100)} %</span>
+            ${count ? `<span class="hint">Sett ${count} ganger i nærheten før</span>` : ''}
             ${a.saertrekk ? `<span class="saertrekk">${escapeHtml(a.saertrekk)}</span>` : ''}
-          </button>`).join('')}
+          </button>`;
+        }).join('')}
       </div>
       ${FOTOTIPS_HTML}`;
   } else {
@@ -1234,6 +1257,7 @@ function renderRegisterPanel(state){
       <button id="saveFindBtn" class="primaryBtn" disabled>Lagre funn</button>
       <button id="cancelFindBtn" class="secondaryBtn">Avbryt</button>
     </div>`;
+  if (alternativer.length) lastKandidatMiniatyrer(alternativer);
 
   const pickBtn = el('pickPosBtn') || el('changePosBtn');
   if (pickBtn) pickBtn.addEventListener('click', pickPositionOnMap);

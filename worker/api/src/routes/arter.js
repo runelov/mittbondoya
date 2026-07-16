@@ -3,7 +3,7 @@ import { corsHeaders } from '../lib/cors.js';
 import { requireSession } from '../lib/session.js';
 import { sjekkOgTellIp } from '../lib/ratelimit.js';
 import { utledArtstype, ARTSKART_API } from '../lib/taxonomi.js';
-import { hentWikipediaSammendrag } from '../lib/wikipedia.js';
+import { hentWikipediaSammendrag, hentWikipediaMiniatyrbilde } from '../lib/wikipedia.js';
 
 // Live søkeproxy mot Artsdatabankens offentlige taxon-API — samme vert
 // fetch_artskart.py (bondoya-db) allerede bruker for taxon-ID-oppslag.
@@ -116,4 +116,18 @@ export async function hentArtsbeskrivelse({ request, env, params }) {
   ).bind(taxonId, wiki.beskrivelse, wiki.wikipediaUrl).run();
 
   return json({ beskrivelse: wiki.beskrivelse, kilde: 'wikipedia', wikipediaUrl: wiki.wikipediaUrl }, 200, cors);
+}
+
+// Referansebilde for KI-kandidater under registrering (se js/app.js sin
+// candidateCard-visning) — disse har aldri en taxonId (ren bildegjenkjenning,
+// ingen Artsdatabanken-oppslag), så oppslaget skjer på navn og caches ikke
+// (se hentWikipediaMiniatyrbilde i lib/wikipedia.js for hvorfor).
+export async function hentArtMiniatyrbilde({ request, env }) {
+  const cors = corsHeaders(env);
+  const bruker = await requireSession(request, env);
+  if (!bruker) return json({ error: 'Ikke innlogget.' }, 401, cors);
+
+  const latinskNavn = (new URL(request.url).searchParams.get('latinsk') || '').trim();
+  const thumbnailUrl = await hentWikipediaMiniatyrbilde(latinskNavn);
+  return json({ thumbnailUrl }, 200, cors);
 }

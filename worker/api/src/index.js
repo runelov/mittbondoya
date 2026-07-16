@@ -17,7 +17,7 @@ import { listFunnOffentlig, hentOffentligInnstillinger } from './routes/offentli
 import { hentFlis } from './routes/tiles.js';
 import { listSider, hentSide } from './routes/sider.js';
 import { sjekkInvitasjon, registrerMedInvitasjon } from './routes/invitasjoner.js';
-import { sokArter, hentArtsbeskrivelse } from './routes/arter.js';
+import { sokArter, hentArtsbeskrivelse, hentArtMiniatyrbilde } from './routes/arter.js';
 import { gjenkjennArt } from './routes/ki.js';
 
 const router = createRouter();
@@ -35,6 +35,7 @@ router.get('/offentlig/innstillinger', hentOffentligInnstillinger);
 router.get('/tiles/:z/:x/:y', hentFlis);
 router.get('/arter/sok', sokArter);
 router.get('/arter/:taxonId/beskrivelse', hentArtsbeskrivelse);
+router.get('/arter/miniatyrbilde', hentArtMiniatyrbilde);
 router.patch('/admin/arter/:taxonId/beskrivelse', settArtsbeskrivelse);
 router.post('/ki/gjenkjenn', gjenkjennArt);
 router.get('/admin/brukere', listBrukere);

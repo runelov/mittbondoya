@@ -1,5 +1,27 @@
 # Endringslogg
 
+## 0.9.15 — Bedre grunnlag for å velge riktig KI-kandidat
+Svar på spørsmålet "hva slags informasjon fra Artsdatabanken kunne vært
+presentert for å gjøre det enklere å velge riktig, når KI foreslår flere
+kandidater?" — tre nivåer vurdert, de to med best nytte/kost gjennomført:
+
+- **"Sett N ganger i nærheten før" per kandidat** — data appen allerede
+  hadde (samme `nearbyCountFor()`/artskart-cache som funndetaljer og
+  KI-promptens `plausibilitet`-felt bruker), men som aldri ble vist i selve
+  kandidatvalget. Ingen nye nettverkskall.
+- **Artstype-badge per kandidat** — samme resonnement, feltet fantes
+  allerede på hvert kandidatobjekt.
+- **Referansebilde per kandidat fra Wikipedia** — ny, ukachet rute
+  `GET /arter/miniatyrbilde?latinsk=...` (`hentWikipediaMiniatyrbilde()` i
+  lib/wikipedia.js, gjenbruker samme sideoppslag-mekanisme som artsomtale-
+  funksjonen i 0.9.14). KI-kandidater har aldri en taxonId å cache mot (ren
+  bildegjenkjenning, ikke Artsdatabanken-oppslag), så dette er bevisst et
+  navnebasert, ukachet oppslag — ett per kandidat, hentet asynkront etter at
+  kortene allerede vises.
+- **Rødlistestatus per kandidat vurdert, men droppet**: hjelper ikke med å
+  SKILLE like arter fra hverandre (det gjør bildet/særtrekk-teksten), og
+  ville krevd et navnebasert Artsdatabanken-søk per kandidat for lite nytte.
+
 ## 0.9.14 — Artsomtale for alle arter, ikke bare de 17 kuraterte
 Direkte oppfølging av 0.9.13: "kun 17 arter har beskrivelse" var aldri
 intensjonen, bare en bieffekt av at `data/species.json` sitt `beskrivelse`-

@@ -307,6 +307,16 @@ async function hentArtsbeskrivelse(taxonId, latinsk) {
   return res.json();
 }
 
+// Referansebilde for KI-kandidater (se candidateCard-visningen i app.js) —
+// ukachet, feiler bevisst aldri (samme "ikke-kritisk visningsdetalj"-
+// resonnement som sokArter/hentArtsbeskrivelse).
+async function hentArtMiniatyrbilde(latinsk) {
+  if (!latinsk) return { thumbnailUrl: null };
+  const res = await kall(`/arter/miniatyrbilde?latinsk=${encodeURIComponent(latinsk)}`);
+  if (!res.ok) return { thumbnailUrl: null };
+  return res.json();
+}
+
 async function settArtsbeskrivelse(taxonId, beskrivelse) {
   const res = await kall(`/admin/arter/${taxonId}/beskrivelse`, {
     method: 'PATCH',
@@ -366,6 +376,7 @@ window.ApiClient = {
   hentAdminDashboard,
   sokArter,
   hentArtsbeskrivelse,
+  hentArtMiniatyrbilde,
   settArtsbeskrivelse,
   gjenkjennArt,
 };
