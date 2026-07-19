@@ -72,10 +72,20 @@ export async function registrerMedInvitasjon({ request, env, params }) {
   // e-post-forsøk kaster invitasjonen (aksepterer denne edge-casen fremfor
   // ekte multi-statement-transaksjoner, se plan-notatet for begrunnelse).
   // Alltid rolle='bruker' — aldri admin via denne selvbetjente flyten.
+  //
+  // aktivert_tidspunkt settes med det samme: å løse inn en invitasjonstoken
+  // krever samme 256-bit engangsbevis som et magic-link-klikk (se
+  // tillitsnivå-kommentaren øverst i filen), så dette ER en aktivering —
+  // ikke bare en registrering. Uten dette forble kontoen stående som
+  // "registrert, men ikke aktivert ennå" i adminens brukerliste (js/app.js)
+  // i det uendelige for alle som logget inn via invitasjon i stedet for
+  // be-om-lenke, selv om de faktisk var aktive brukere av appen — se
+  // migrations/0016 og routes/auth.js sin beOmLenke() for søsterlogikken.
   let bruker;
   try {
     bruker = await env.DB.prepare(
-      `INSERT INTO brukere (epost, kortnavn, rolle, status) VALUES (?, ?, 'bruker', 'aktiv') RETURNING *`
+      `INSERT INTO brukere (epost, kortnavn, rolle, status, aktivert_tidspunkt)
+       VALUES (?, ?, 'bruker', 'aktiv', datetime('now')) RETURNING *`
     )
       .bind(invitasjon.epost, kortnavn)
       .first();

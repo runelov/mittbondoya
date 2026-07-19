@@ -1,5 +1,35 @@
 # Endringslogg
 
+## 0.9.25 — Aktivert-status for invitasjonsbrukere, og synk-kø som satt seg fast
+To relaterte funn fra brukertilbakemelding 2026-07-19.
+
+**Adminens brukerliste viste "Registrert, men ikke aktivert ennå" for en
+bruker som beviselig var aktivt pålogget.** `aktivert_tidspunkt`
+(migrations/0016) ble kun satt i `beOmLenke()` (routes/auth.js) — men
+`registrerMedInvitasjon()` (routes/invitasjoner.js) oppretter brukeren
+*og* logger dem rett inn i samme kall, uten noensinne å gå via
+`beOmLenke()`. Alle som logget inn første gang via en invitasjonslenke
+(den vanlige veien) sto dermed evig som "ikke aktivert" i adminlista, selv
+om innløsning av en invitasjonstoken krever samme 256-bit engangsbevis som
+et magic-link-klikk — reelt sett samme tillitsnivå. Fikset ved å sette
+`aktivert_tidspunkt` direkte i INSERT-en i `registrerMedInvitasjon()`.
+Eksisterende berørte brukere (registrert via invitasjon før denne fiksen)
+backfilles manuelt mot remote D1 (ikke en migrasjon — engangs datafiks).
+
+**Et funn kunne bli stående i den lokale synk-køen i timevis uten at noe
+skjedde.** `saveFind()` sitt feilspor (`js/app.js`) la et funn som feilet
+direktelagring inn i `OfflineQueue`, men kalte kun `renderQueueBadge()` —
+aldri et nytt forsøk på å synke. Eneste triggere for et nytt forsøk var
+sideinnlasting og nettleserens `online`-event; hvis brukeren var tilkoblet
+hele tiden (feilen skyldtes noe annet enn manglende nett) og aldri lastet
+siden på nytt, sto funnet uendret helt til en av de to inntraff — observert
+konkret som "1 venter på synk" i 10-12 timer. Fikset: `saveFind()` prøver
+synk umiddelbart igjen etter en mislykket direktelagring, et
+`setInterval(trySync, 5 min)` er lagt til som sikkerhetsnett, synk-pillen
+er nå klikkbar for manuell retry, og badgeteksten skiller "venter" fra
+"feilet ved synk" (feilede elementer var før visuelt identiske med de som
+bare ventet på sitt første forsøk).
+
 ## 0.9.24 — Cache-busting query-strenger på css/js
 Nettverk-først-fiksen i 0.9.23 løste service worker-cachen, men vanlig
 HTTP-cache i nettleseren for `<link>`/`<script>`-taggene i `index.html` var

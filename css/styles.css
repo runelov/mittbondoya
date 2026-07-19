@@ -71,6 +71,11 @@ body{
   font-weight: 600;
 }
 
+/* Tappbar for manuelt synk-forsøk, se el('syncStatus').addEventListener i app.js */
+#syncStatus{
+  cursor: pointer;
+}
+
 /* Synlig, tappbar markør for at funn er filtrert (se oppdaterFilterIndikator
    i app.js) — egen rad under topBar i stedet for inni, slik at den ikke
    forstyrrer topBar sin faste ikon-plassering (space-between). */

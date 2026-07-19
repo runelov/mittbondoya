@@ -2,8 +2,8 @@
 (function(){
 "use strict";
 
-const APP_VERSION = '0.9.24';
-const APP_BUILD_DATE = '2026-07-16';
+const APP_VERSION = '0.9.25';
+const APP_BUILD_DATE = '2026-07-19';
 
 // Speilbilde av ARTSTYPER i worker/api/src/lib/taxonomi.js — appen har
 // ingen build-step som lar de to dele en fil, så listen må holdes i synk
@@ -69,8 +69,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   window.addEventListener('online', () => { updateSyncPill(); trySync(); });
   window.addEventListener('offline', updateSyncPill);
+  el('syncStatus').addEventListener('click', () => trySync());
   updateSyncPill();
   trySync();
+  // Sikkerhetsnett: uten dette ble et køet funn stående uendret i timevis
+  // hvis fanen aldri lastes på nytt og nettleseren aldri går offline→online
+  // (de eneste to andre triggerne over) — f.eks. hvis køingen skyldtes en
+  // midlertidig serverfeil mens man fortsatt var tilkoblet hele tiden.
+  setInterval(trySync, 5 * 60 * 1000);
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => console.warn('SW-registrering feilet', err));
@@ -1010,7 +1016,15 @@ async function renderQueueBadge(){
   const pill = el('syncStatus');
   if (items.length > 0 && brukerCache) {
     pill.hidden = false;
-    pill.textContent = `⏳ ${items.length} venter på synk`;
+    // 'feilet' vises atskilt fra 'venter'/'synker' — uten dette så et funn
+    // som faktisk HAR blitt forsøkt synket og feilet (se feilmelding i
+    // konsollen) identisk ut som ett som bare venter på sitt første forsøk,
+    // og brukeren fikk ikke noe signal om at noe var galt utover en toast
+    // som lett forsvinner ubemerket.
+    const feilet = items.filter(i => i.status === 'feilet').length;
+    pill.textContent = feilet > 0
+      ? `⚠️ ${feilet} feilet ved synk — trykk for å prøve igjen`
+      : `⏳ ${items.length} venter på synk`;
   }
 }
 
@@ -1499,6 +1513,16 @@ async function saveFind(art){
       return;
     } catch (e) {
       console.warn('Direkte lagring feilet, legger i offline-kø i stedet', e);
+      await window.OfflineQueue.queueAdd(entry);
+      showToast('Kunne ikke lagre direkte — funnet er lagret lokalt og prøves synket på nytt nå.');
+      // Feilen her var IKKE nødvendigvis "ingen nett" (det sjekket if-en over
+      // allerede) — kan like gjerne være en midlertidig 5xx fra Workeren.
+      // Derfor prøver vi å synke med det samme i stedet for å vente på neste
+      // sideinnlasting eller en online-event som kanskje aldri kommer siden
+      // nettleseren allerede var tilkoblet — se trySync()/syncQueue() i
+      // offline-queue.js for hvorfor det ellers kan stå uendret i timevis.
+      await trySync();
+      return;
     }
   }
 
